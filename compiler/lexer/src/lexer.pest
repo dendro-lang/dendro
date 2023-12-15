@@ -1,0 +1,173 @@
+WHITESPACE    = _{
+    // Usual ASCII suspects
+    "\t" // \t
+
+  | "\n" // \n
+
+  | "\u{000B}" // vertical tab
+
+  | "\u{000C}" // form feed
+
+  | "\r" // \r
+
+  | "\u{0020}" // space
+  // NEXT LINE from latin1
+
+  | "\u{0085}" // Bidi markers
+
+  | "\u{200E}" // LEFT-TO-RIGHT MARK
+
+  | "\u{200F}" // RIGHT-TO-LEFT MARK
+  // Dedicated whitespace characters from Unicode
+
+  | "\u{2028}" // LINE SEPARATOR
+
+  | "\u{2029}" // PARAGRAPH SEPARATOR
+}
+LineDocStyle  =  { "!" | "/" }
+LineComment   = ${ "//" ~ LineDocStyle? ~ (!NEWLINE ~ ANY)* }
+BlockDocStyle =  { "!" | "*" }
+BlockComment  = ${ "/*" ~ BlockDocStyle? ~ (BlockComment | (!"*/" ~ ANY))* ~ "*/" }
+COMMENT       =  { LineComment | BlockComment }
+
+Ident    = @{ ("_" | ASCII_ALPHA) ~ (("_" | ASCII_ALPHANUMERIC)*) }
+RawIdent = ${ "r#" ~ Ident }
+
+Prefix = ${ Ident ~ &("\"" | "'" | "#") }
+
+LiteralSuffix    = ${ Ident }
+LiteralSuffixNoE = ${ !^"e" ~ Ident }
+
+QuoteEscape   =  { "\"" | "'" }
+UnicodeEscape = @{ "u{" ~ ("_" | ASCII_HEX_DIGIT)+ ~ "}" }
+ControlEscape =  { "n" | "r" | "t" | "\\" | "0" }
+AsciiRaw      = @{ "x" ~ ASCII_OCT_DIGIT ~ ASCII_HEX_DIGIT }
+AsciiEscape   =  { ControlEscape | AsciiRaw }
+
+CharExcept =  { "\\" | "\n" | "\r" | "\t" }
+CharEscape = @{ "\\" ~ (QuoteEscape | AsciiEscape | UnicodeEscape) }
+
+CharContent =  { (!("'" | CharExcept) ~ ANY) | CharEscape }
+Char        = ${
+    "'" ~ CharContent ~ "'" ~ LiteralSuffix?
+}
+
+StringContinue = @{ "\\\n" }
+StringContent  =  { (!("\"" | CharExcept) ~ ANY) | CharEscape | StringContinue }
+String         = ${
+    "\"" ~ StringContent* ~ "\"" ~ LiteralSuffix?
+}
+
+ByteRaw    = @{ "x" ~ ASCII_HEX_DIGIT{, 2} }
+ByteEscape = @{ "\\" ~ (QuoteEscape | ControlEscape | ByteRaw) }
+
+ByteContent =  { (!("'" | CharExcept) ~ '\u{0000}'..'\u{0100}') | ByteEscape }
+Byte        = ${ "b'" ~ ByteContent ~ "'" ~ LiteralSuffix? }
+
+ByteStringContent =  { (!("\"" | CharExcept) ~ '\u{0000}'..'\u{0100}') | ByteEscape | StringContinue }
+ByteString        = ${ "b\"" ~ ByteStringContent* ~ "\"" ~ LiteralSuffix? }
+
+CEscape  = @{ "\\" ~ (QuoteEscape | AsciiEscape) }
+CStringContent =  { (!("\"" | CharExcept) ~ '\x00'..'\x80') | CEscape | StringContinue }
+CString        = ${ "c\"" ~ CStringContent* ~ "\"" ~ LiteralSuffix? }
+
+Bin = @{ "0b" ~ "_"* ~ ASCII_BIN_DIGIT ~ ("_" | ASCII_BIN_DIGIT)* }
+Oct = @{ "0o" ~ "_"* ~ ASCII_OCT_DIGIT ~ ("_" | ASCII_OCT_DIGIT)* }
+Hex = @{ "0x" ~ "_"* ~ ASCII_HEX_DIGIT ~ ("_" | ASCII_HEX_DIGIT)* }
+Dec = @{ ASCII_DIGIT ~ ("_" | ASCII_DIGIT)* }
+
+Integer = ${ (Bin | Oct | Hex | Dec) ~ LiteralSuffixNoE? }
+
+FloatExponent = @{ ^"e" ~ ("+" | "-")? ~ "_"* ~ ASCII_DIGIT ~ ("_" | ASCII_DIGIT)* }
+Float         = ${
+    (Dec ~ ("." ~ Dec)? ~ FloatExponent ~ LiteralSuffix?)
+  | (Dec ~ "." ~ Dec ~ LiteralSuffixNoE?)
+  | (Dec ~ "." ~ !("." | "_" | Ident))
+}
+
+Lifetime = ${ ("'" ~ Ident) | "'_" }
+
+Literal = {
+    Float
+  | Integer
+  | Char
+  | String
+  | Byte
+  | ByteString
+  | CString
+}
+
+Semi  = { ";" }
+Comma = { "," }
+Dot   = { "." }
+
+OpenParen  = { "(" }
+CloseParen = { ")" }
+
+OpenBrace  = { "{" }
+CloseBrace = { "}" }
+
+OpenBracket  = { "[" }
+CloseBracket = { "]" }
+
+At        = { "@" }
+Pound     = { "#" }
+Tilde     = { "~" }
+Question  = { "?" }
+Colon     = { ":" }
+Dollar    = { "$" }
+Eq        = { "=" }
+Bang      = { "!" }
+Lt        = { "<" }
+Gt        = { ">" }
+Minus     = { "-" }
+And       = { "&" }
+Or        = { "|" }
+Plus      = { "+" }
+Star      = { "*" }
+Slash     = { "/" }
+BackSlash = { "\\" }
+Percent   = { "%" }
+Caret     = { "^" }
+
+Token = {
+    LineComment
+  | BlockComment
+  | Ident
+  | RawIdent
+  | Prefix
+  | Lifetime
+  | Literal
+  | Semi
+  | Comma
+  | Dot
+  | OpenParen
+  | CloseParen
+  | OpenBrace
+  | CloseBrace
+  | OpenBracket
+  | CloseBracket
+  | At
+  | Pound
+  | Tilde
+  | Question
+  | Colon
+  | Dollar
+  | Eq
+  | Bang
+  | Lt
+  | Gt
+  | Minus
+  | And
+  | Or
+  | Plus
+  | Star
+  | Slash
+  | BackSlash
+  | Percent
+  | Caret
+}
+
+Tokens = {
+    (WHITESPACE* ~ Token)* ~ WHITESPACE*
+}
