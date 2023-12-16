@@ -90,12 +90,14 @@ pub enum TokenKind {
     /// etc) similarly to symbols in string literal tokens.
     DocComment(CommentKind, AttrStyle, Symbol),
 }
+pub use TokenKind::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CommentKind {
     Line,
     Block,
 }
+pub use CommentKind::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AttrStyle {
@@ -109,6 +111,7 @@ pub enum BinOpToken {
     Minus,
     Star,
     Slash,
+    BackSlash,
     Percent,
     Caret,
     And,
@@ -116,6 +119,7 @@ pub enum BinOpToken {
     Shl,
     Shr,
 }
+pub use BinOpToken::*;
 
 /// Describes how a sequence of token trees is delimited.
 /// Cannot use `proc_macro::Delimiter` directly because this
@@ -129,6 +133,7 @@ pub enum Delimiter {
     /// `[ ... ]`
     Bracket,
 }
+pub use Delimiter::*;
 
 // Note that the suffix is *not* considered when deciding the `LitKind` in this
 // type. This means that float literals like `1f32` are classified by this type
@@ -145,6 +150,7 @@ pub enum LitKind {
     ByteStr,
     CStr,
 }
+pub use LitKind::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Lit {

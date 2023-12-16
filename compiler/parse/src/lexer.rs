@@ -1,4 +1,4 @@
-use dendro_ast::token::{AttrStyle, CommentKind, Delimiter, Lit, LitKind, Token, TokenKind::*};
+use dendro_ast::token::{self, AttrStyle, CommentKind, Lit, LitKind, Token};
 use dendro_lexer::Rule;
 use dendro_span::symbol::Symbol;
 use pest::{error::Error, iterators::Pair, Span};
@@ -38,28 +38,34 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(
     _: I,
     pair: Pair<'a, Rule>,
 ) -> Option<Token<'a>> {
-    Some(match pair.as_rule() {
-        Rule::LineComment => lex_comment(CommentKind::Line, pair)?,
-        Rule::BlockComment => lex_comment(CommentKind::Block, pair)?,
-        Rule::Ident => Token {
-            kind: Ident(Symbol::new(pair.as_str()), false),
-            span: pair.as_span(),
-        },
+    let span = pair.as_span();
+
+    let kind = match pair.as_rule() {
+        Rule::LineComment => return lex_comment(token::Line, pair),
+        Rule::BlockComment => return lex_comment(token::Block, pair),
+        Rule::Ident => token::Ident(Symbol::new(pair.as_str()), false),
         Rule::RawIdent => {
             let inner = pair.into_inner().next().unwrap();
             debug_assert_eq!(inner.as_rule(), Rule::Ident);
-            Token {
-                kind: Ident(Symbol::new(inner.as_str()), true),
+            return Some(Token {
+                kind: token::Ident(Symbol::new(inner.as_str()), true),
                 span: inner.as_span(),
-            }
+            });
         }
         Rule::Prefix => todo!(),
-        Rule::Lifetime => todo!(),
+        Rule::Lifetime => {
+            let inner = pair.into_inner().next().unwrap();
+            debug_assert_eq!(inner.as_rule(), Rule::Ident);
+            return Some(Token {
+                kind: token::Lifetime(Symbol::new(inner.as_str())),
+                span: inner.as_span(),
+            });
+        }
         Rule::Literal => {
-            let pair = pair.into_inner().next().unwrap();
-            let span = pair.as_span();
+            let inner = pair.into_inner().next().unwrap();
+            let span = inner.as_span();
 
-            let suffix = pair
+            let suffix = inner
                 .clone()
                 .into_inner()
                 .find(|i| matches!(i.as_rule(), Rule::LiteralSuffix | Rule::LiteralSuffixNoE));
@@ -67,64 +73,48 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(
 
             let suffix = suffix.map(|s| Symbol::new(s.as_str()));
 
-            let (kind, symbol) = lex_literal(pair, suffix_start);
-            Token {
-                kind: Literal(Lit {
+            let (kind, symbol) = lex_literal(inner, suffix_start);
+            return Some(Token {
+                kind: token::Literal(Lit {
                     kind,
                     symbol,
                     suffix,
                 }),
                 span,
-            }
+            });
         }
-        Rule::Semi => todo!(),
-        Rule::Comma => todo!(),
-        Rule::Dot => todo!(),
-        Rule::OpenParen => Token {
-            kind: OpenDelim(Delimiter::Parenthesis),
-            span: pair.as_span(),
-        },
-        Rule::CloseParen => Token {
-            kind: CloseDelim(Delimiter::Parenthesis),
-            span: pair.as_span(),
-        },
-        Rule::OpenBrace => Token {
-            kind: OpenDelim(Delimiter::Brace),
-            span: pair.as_span(),
-        },
-        Rule::CloseBrace => Token {
-            kind: CloseDelim(Delimiter::Brace),
-            span: pair.as_span(),
-        },
-        Rule::OpenBracket => Token {
-            kind: OpenDelim(Delimiter::Bracket),
-            span: pair.as_span(),
-        },
-        Rule::CloseBracket => Token {
-            kind: CloseDelim(Delimiter::Bracket),
-            span: pair.as_span(),
-        },
-        Rule::At => todo!(),
-        Rule::Pound => todo!(),
-        Rule::Tilde => todo!(),
-        Rule::Question => todo!(),
-        Rule::Colon => todo!(),
-        Rule::Dollar => todo!(),
-        Rule::Eq => todo!(),
-        Rule::Bang => todo!(),
-        Rule::Lt => todo!(),
-        Rule::Gt => todo!(),
-        Rule::Minus => todo!(),
-        Rule::And => todo!(),
-        Rule::Or => todo!(),
-        Rule::Plus => todo!(),
-        Rule::Star => todo!(),
-        Rule::Slash => todo!(),
-        Rule::BackSlash => todo!(),
-        Rule::Percent => todo!(),
-        Rule::Caret => todo!(),
+        Rule::Semi => token::Semi,
+        Rule::Comma => token::Comma,
+        Rule::Dot => token::Dot,
+        Rule::OpenParen => token::OpenDelim(token::Parenthesis),
+        Rule::CloseParen => token::CloseDelim(token::Parenthesis),
+        Rule::OpenBrace => token::OpenDelim(token::Brace),
+        Rule::CloseBrace => token::CloseDelim(token::Brace),
+        Rule::OpenBracket => token::OpenDelim(token::Bracket),
+        Rule::CloseBracket => token::CloseDelim(token::Bracket),
+        Rule::At => token::At,
+        Rule::Pound => token::Pound,
+        Rule::Tilde => token::Tilde,
+        Rule::Question => token::Question,
+        Rule::Colon => token::Colon,
+        Rule::Dollar => token::Dollar,
+        Rule::Eq => token::Eq,
+        Rule::Bang => token::Not,
+        Rule::Lt => token::Lt,
+        Rule::Gt => token::Gt,
+        Rule::Minus => token::BinOp(token::Minus),
+        Rule::And => token::BinOp(token::And),
+        Rule::Or => token::BinOp(token::Or),
+        Rule::Plus => token::BinOp(token::Plus),
+        Rule::Star => token::BinOp(token::Star),
+        Rule::Slash => token::BinOp(token::Slash),
+        Rule::BackSlash => token::BinOp(token::BackSlash),
+        Rule::Percent => token::BinOp(token::Percent),
+        Rule::Caret => token::BinOp(token::Caret),
         _ => unreachable!(),
-    })
+    };
+
+    Some(Token { kind, span })
 }
 
 fn lex_comment(kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token<'_>> {
@@ -142,7 +132,7 @@ fn lex_comment(kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token<'_>> {
         let start = inner.as_span().end_pos();
         let span = start.span(&span.end_pos());
         return Some(Token {
-            kind: DocComment(kind, style, Symbol::new(span.as_str())),
+            kind: token::DocComment(kind, style, Symbol::new(span.as_str())),
             span,
         });
     }
@@ -154,13 +144,13 @@ fn lex_literal(pair: Pair<'_, Rule>, suffix_start: usize) -> (LitKind, Symbol) {
     let start = span.start();
 
     let (kind, start_offset, end_offset) = match pair.as_rule() {
-        Rule::Integer => (LitKind::Integer, 0, 0),
-        Rule::Float => (LitKind::Float, 0, 0),
-        Rule::Char => (LitKind::Char, 1, 1),
-        Rule::String => (LitKind::Str, 1, 1),
-        Rule::Byte => (LitKind::Byte, 2, 1),
-        Rule::ByteString => (LitKind::ByteStr, 2, 1),
-        Rule::CString => (LitKind::CStr, 2, 1),
+        Rule::Integer => (token::Integer, 0, 0),
+        Rule::Float => (token::Float, 0, 0),
+        Rule::Char => (token::Char, 1, 1),
+        Rule::String => (token::Str, 1, 1),
+        Rule::Byte => (token::Byte, 2, 1),
+        Rule::ByteString => (token::ByteStr, 2, 1),
+        Rule::CString => (token::CStr, 2, 1),
         _ => unreachable!(),
     };
     let span = Span::new(
