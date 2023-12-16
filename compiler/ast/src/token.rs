@@ -48,7 +48,7 @@ pub enum TokenKind {
     /// `:`
     Colon,
     /// `::`
-    ModSep,
+    ColonColon,
     /// `->`
     RArrow,
     /// `<-`
@@ -160,7 +160,75 @@ pub struct Lit {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Token<'input> {
+pub struct Token<'i> {
     pub kind: TokenKind,
-    pub span: Span<'input>,
+    pub span: Span<'i>,
+}
+
+impl<'i> Token<'i> {
+    pub fn new(kind: TokenKind, span: Span<'i>) -> Self {
+        Token { kind, span }
+    }
+
+    pub fn glue(&self, joint: &Self) -> Option<Self> {
+        let kind = match self.kind {
+            Eq => match joint.kind {
+                Eq => EqEq,
+                Gt => FatArrow,
+                _ => return None,
+            },
+            Lt => match joint.kind {
+                Eq => Le,
+                Lt => BinOp(Shl),
+                Le => BinOpEq(Shl),
+                BinOp(Minus) => LArrow,
+                _ => return None,
+            },
+            Gt => match joint.kind {
+                Eq => Ge,
+                Gt => BinOp(Shr),
+                Ge => BinOpEq(Shr),
+                _ => return None,
+            },
+            Not => match joint.kind {
+                Eq => Ne,
+                _ => return None,
+            },
+            BinOp(op) => match joint.kind {
+                Eq => BinOpEq(op),
+                BinOp(And) if op == And => AndAnd,
+                BinOp(Or) if op == Or => OrOr,
+                Gt if op == Minus => RArrow,
+                _ => return None,
+            },
+            Dot => match joint.kind {
+                Dot => DotDot,
+                DotDot => DotDotDot,
+                _ => return None,
+            },
+            DotDot => match joint.kind {
+                Dot => DotDotDot,
+                Eq => DotDotEq,
+                _ => return None,
+            },
+            Colon => match joint.kind {
+                Colon => ColonColon,
+                _ => return None,
+            },
+            SingleQuote => match joint.kind {
+                Ident(name, false) => Lifetime(Symbol::new_owned(format!("'{name}"))),
+                _ => return None,
+            },
+
+            Le | EqEq | Ne | Ge | AndAnd | OrOr | Tilde | BinOpEq(..) | At | DotDotDot
+            | DotDotEq | Comma | Semi | ColonColon | RArrow | LArrow | FatArrow | Pound
+            | Dollar | Question | OpenDelim(..) | CloseDelim(..) | Literal(..) | Ident(..)
+            | Lifetime(..) | DocComment(..) => return None,
+        };
+
+        Some(Token::new(
+            kind,
+            self.span.start_pos().span(&joint.span.end_pos()),
+        ))
+    }
 }

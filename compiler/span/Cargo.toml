@@ -5,4 +5,4 @@ version = "0.1.0"
 
 [dependencies]
 # External crates
-internment = {version = "0.7", features = ["arc"]}
+strpool = "1.0"
