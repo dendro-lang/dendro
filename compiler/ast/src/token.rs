@@ -1,5 +1,4 @@
-use dendro_span::symbol::Symbol;
-use pest::Span;
+use dendro_span::{span::Span, symbol::Symbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKind {
@@ -160,13 +159,13 @@ pub struct Lit {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Token<'i> {
+pub struct Token {
     pub kind: TokenKind,
-    pub span: Span<'i>,
+    pub span: Span,
 }
 
-impl<'i> Token<'i> {
-    pub fn new(kind: TokenKind, span: Span<'i>) -> Self {
+impl Token {
+    pub fn new(kind: TokenKind, span: Span) -> Self {
         Token { kind, span }
     }
 
@@ -226,9 +225,6 @@ impl<'i> Token<'i> {
             | Lifetime(..) | DocComment(..) => return None,
         };
 
-        Some(Token::new(
-            kind,
-            self.span.start_pos().span(&joint.span.end_pos()),
-        ))
+        Some(Token::new(kind, self.span.to(&joint.span)))
     }
 }

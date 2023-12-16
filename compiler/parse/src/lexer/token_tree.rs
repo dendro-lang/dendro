@@ -14,7 +14,7 @@ where
     I: Iterator<Item = Pair<'i, Rule>> + 'i,
 {
     tokens: Tokens<'i, I>,
-    current: Option<Token<'i>>,
+    current: Option<Token>,
 }
 
 impl<'i, I> TokenTrees<'i, I>
@@ -28,7 +28,7 @@ where
         }
     }
 
-    fn next_token_tree(&mut self) -> Result<(TokenTree<'i>, Spacing), Box<dyn Error>> {
+    fn next_token_tree(&mut self) -> Result<(TokenTree, Spacing), Box<dyn Error>> {
         match self.current {
             Some(token) => match token.kind {
                 token::OpenDelim(delim) => {
@@ -79,7 +79,7 @@ where
         spacing
     }
 
-    fn token_trees_until_close_delim(&mut self) -> Result<TokenStream<'i>, Box<dyn Error>> {
+    fn token_trees_until_close_delim(&mut self) -> Result<TokenStream, Box<dyn Error>> {
         let mut vec = TokenStreamBuilder::new();
         loop {
             let is_eof_or_close = matches!(
@@ -96,7 +96,7 @@ where
         }
     }
 
-    pub fn parse(mut self) -> Result<TokenStream<'i>, Box<dyn Error>> {
+    pub fn parse(mut self) -> Result<TokenStream, Box<dyn Error>> {
         let mut vec = TokenStreamBuilder::new();
         self.bump();
         while self.current.is_some() {
@@ -106,16 +106,16 @@ where
     }
 }
 
-struct TokenStreamBuilder<'i> {
-    vec: Vec<(TokenTree<'i>, Spacing)>,
+struct TokenStreamBuilder {
+    vec: Vec<(TokenTree, Spacing)>,
 }
 
-impl<'i> TokenStreamBuilder<'i> {
+impl TokenStreamBuilder {
     fn new() -> Self {
         TokenStreamBuilder { vec: Vec::new() }
     }
 
-    fn push(&mut self, (tree, joint): (TokenTree<'i>, Spacing)) {
+    fn push(&mut self, (tree, joint): (TokenTree, Spacing)) {
         if let Some((TokenTree::Token(prev_token), Spacing::Joint)) = self.vec.last()
             && let TokenTree::Token(token) = &tree
             && let Some(glued) = prev_token.glue(token)
@@ -127,7 +127,7 @@ impl<'i> TokenStreamBuilder<'i> {
         self.vec.push((tree, joint))
     }
 
-    fn build(self) -> TokenStream<'i> {
+    fn build(self) -> TokenStream {
         TokenStream::new(self.vec)
     }
 }

@@ -27,7 +27,7 @@ impl<'i, I> Tokens<'i, I>
 where
     I: Iterator<Item = Pair<'i, Rule>> + 'i,
 {
-    pub fn next_token(&mut self) -> (Spacing, Option<Token<'i>>) {
+    pub fn next_token(&mut self) -> (Spacing, Option<Token>) {
         loop {
             let pair = match self.iter.next() {
                 Some(pair) => pair,
@@ -46,10 +46,7 @@ where
     }
 }
 
-fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(
-    _: I,
-    pair: Pair<'a, Rule>,
-) -> Option<Token<'a>> {
+fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) -> Option<Token> {
     let span = pair.as_span();
 
     let kind = match pair.as_rule() {
@@ -61,7 +58,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(
             debug_assert_eq!(inner.as_rule(), Rule::Ident);
             return Some(Token {
                 kind: token::Ident(Symbol::new(inner.as_str()), true),
-                span: inner.as_span(),
+                span: inner.as_span().into(),
             });
         }
         Rule::Prefix => todo!(),
@@ -70,7 +67,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(
             debug_assert_eq!(inner.as_rule(), Rule::Ident);
             return Some(Token {
                 kind: token::Lifetime(Symbol::new(inner.as_str())),
-                span: inner.as_span(),
+                span: inner.as_span().into(),
             });
         }
         Rule::Literal => {
@@ -92,7 +89,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(
                     symbol,
                     suffix,
                 }),
-                span,
+                span: span.into(),
             });
         }
         Rule::Semi => token::Semi,
@@ -126,10 +123,13 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(
         _ => unreachable!(),
     };
 
-    Some(Token { kind, span })
+    Some(Token {
+        kind,
+        span: span.into(),
+    })
 }
 
-fn lex_comment(kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token<'_>> {
+fn lex_comment(kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token> {
     let span = pair.as_span();
     if let Some(inner) = pair.into_inner().next() {
         debug_assert!(matches!(
@@ -145,7 +145,7 @@ fn lex_comment(kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token<'_>> {
         let span = start.span(&span.end_pos());
         return Some(Token {
             kind: token::DocComment(kind, style, Symbol::new(span.as_str())),
-            span,
+            span: span.into(),
         });
     }
     None

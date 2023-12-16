@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
-use pest::Span;
+use dendro_span::span::Span;
 use smallvec::SmallVec;
 
 use crate::token::{Delimiter, Token};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TokenTree<'i> {
-    Token(Token<'i>),
+pub enum TokenTree {
+    Token(Token),
     Delimited {
-        open: Span<'i>,
-        close: Span<'i>,
+        open: Span,
+        close: Span,
         delim: Delimiter,
-        inner: TokenStream<'i>,
+        inner: TokenStream,
     },
 }
 
@@ -22,17 +22,17 @@ pub enum Spacing {
     Joint,
 }
 
-impl<'i> From<TokenTree<'i>> for (TokenTree<'i>, Spacing) {
-    fn from(value: TokenTree<'i>) -> Self {
+impl From<TokenTree> for (TokenTree, Spacing) {
+    fn from(value: TokenTree) -> Self {
         (value, Spacing::Alone)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct TokenStream<'i>(pub(crate) Arc<Vec<(TokenTree<'i>, Spacing)>>);
+pub struct TokenStream(pub(crate) Arc<Vec<(TokenTree, Spacing)>>);
 
-impl<'i> TokenStream<'i> {
-    pub fn new(tokens: Vec<(TokenTree<'i>, Spacing)>) -> Self {
+impl TokenStream {
+    pub fn new(tokens: Vec<(TokenTree, Spacing)>) -> Self {
         TokenStream(Arc::new(tokens))
     }
 
@@ -87,14 +87,14 @@ impl<'i> TokenStream<'i> {
 
 // 99.5%+ of the time we have 1 or 2 elements in this vector.
 #[derive(Clone, Default)]
-pub struct TokenStreamBuilder<'i>(SmallVec<[TokenStream<'i>; 2]>);
+pub struct TokenStreamBuilder(SmallVec<[TokenStream; 2]>);
 
-impl<'i> TokenStreamBuilder<'i> {
-    pub fn new() -> TokenStreamBuilder<'i> {
+impl TokenStreamBuilder {
+    pub fn new() -> TokenStreamBuilder {
         TokenStreamBuilder(SmallVec::new())
     }
 
-    pub fn push<T: Into<TokenStream<'i>>>(&mut self, stream: T) {
+    pub fn push<T: Into<TokenStream>>(&mut self, stream: T) {
         let mut stream = stream.into();
 
         // If `self` is not empty and the last tree within the last stream is a
@@ -137,35 +137,35 @@ impl<'i> TokenStreamBuilder<'i> {
         self.0.push(stream);
     }
 
-    pub fn build(self) -> TokenStream<'i> {
+    pub fn build(self) -> TokenStream {
         TokenStream::from_streams(self.0)
     }
 }
 
-impl<'i> TokenStream<'i> {
-    pub fn trees(&self) -> CursorRef<'_, 'i> {
+impl TokenStream {
+    pub fn trees(&self) -> CursorRef<'_> {
         CursorRef::new(self)
     }
 
-    pub fn into_trees(self) -> Cursor<'i> {
+    pub fn into_trees(self) -> Cursor {
         Cursor::new(self)
     }
 }
 
-impl<'a, 'i> IntoIterator for &'a TokenStream<'i> {
-    type IntoIter = CursorRef<'a, 'i>;
+impl<'a> IntoIterator for &'a TokenStream {
+    type IntoIter = CursorRef<'a>;
 
-    type Item = &'a TokenTree<'i>;
+    type Item = &'a TokenTree;
 
     fn into_iter(self) -> Self::IntoIter {
         CursorRef::new(self)
     }
 }
 
-impl<'i> IntoIterator for TokenStream<'i> {
-    type IntoIter = Cursor<'i>;
+impl IntoIterator for TokenStream {
+    type IntoIter = Cursor;
 
-    type Item = TokenTree<'i>;
+    type Item = TokenTree;
 
     fn into_iter(self) -> Self::IntoIter {
         Cursor::new(self)
@@ -173,17 +173,17 @@ impl<'i> IntoIterator for TokenStream<'i> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CursorRef<'a, 'i> {
-    stream: &'a TokenStream<'i>,
+pub struct CursorRef<'a> {
+    stream: &'a TokenStream,
     index: usize,
 }
 
-impl<'a, 'i> CursorRef<'a, 'i> {
-    fn new(stream: &'a TokenStream<'i>) -> Self {
+impl<'a> CursorRef<'a> {
+    fn new(stream: &'a TokenStream) -> Self {
         CursorRef { stream, index: 0 }
     }
 
-    pub fn next_with_spacing(&mut self) -> Option<&'a (TokenTree<'i>, Spacing)> {
+    pub fn next_with_spacing(&mut self) -> Option<&'a (TokenTree, Spacing)> {
         self.stream.0.get(self.index).map(|tree| {
             self.index += 1;
             tree
@@ -191,8 +191,8 @@ impl<'a, 'i> CursorRef<'a, 'i> {
     }
 }
 
-impl<'a, 'i> Iterator for CursorRef<'a, 'i> {
-    type Item = &'a TokenTree<'i>;
+impl<'a> Iterator for CursorRef<'a> {
+    type Item = &'a TokenTree;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_with_spacing().map(|(tree, _)| tree)
@@ -200,24 +200,24 @@ impl<'a, 'i> Iterator for CursorRef<'a, 'i> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Cursor<'i> {
-    stream: TokenStream<'i>,
+pub struct Cursor {
+    stream: TokenStream,
     index: usize,
 }
 
-impl<'i> Cursor<'i> {
-    fn new(stream: TokenStream<'i>) -> Self {
+impl Cursor {
+    fn new(stream: TokenStream) -> Self {
         Cursor { stream, index: 0 }
     }
 
-    pub fn next_with_spacing_ref(&mut self) -> Option<&(TokenTree<'i>, Spacing)> {
+    pub fn next_with_spacing_ref(&mut self) -> Option<&(TokenTree, Spacing)> {
         self.stream.0.get(self.index).map(|tree| {
             self.index += 1;
             tree
         })
     }
 
-    pub fn next_with_spacing(&mut self) -> Option<(TokenTree<'i>, Spacing)> {
+    pub fn next_with_spacing(&mut self) -> Option<(TokenTree, Spacing)> {
         self.next_with_spacing_ref().cloned()
     }
 
@@ -226,8 +226,8 @@ impl<'i> Cursor<'i> {
     }
 }
 
-impl<'i> Iterator for Cursor<'i> {
-    type Item = TokenTree<'i>;
+impl Iterator for Cursor {
+    type Item = TokenTree;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_with_spacing().map(|(tree, _)| tree)
