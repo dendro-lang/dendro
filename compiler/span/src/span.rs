@@ -31,6 +31,8 @@ pub struct Span {
     pub end: Pos,
 }
 
+pub const DUMMY_SPAN: Span = Span::new(Pos(0), Pos(0));
+
 impl From<pest::Span<'_>> for Span {
     fn from(value: pest::Span<'_>) -> Self {
         Span {
@@ -50,8 +52,8 @@ impl From<Pos> for Span {
 }
 
 impl Span {
-    pub fn new(start: Pos, end: Pos) -> Self {
-        assert!(start <= end);
+    pub const fn new(start: Pos, end: Pos) -> Self {
+        assert!(start.0 <= end.0);
         Span { start, end }
     }
 

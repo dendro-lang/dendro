@@ -110,6 +110,7 @@ CloseBrace = { "}" }
 OpenBracket  = { "[" }
 CloseBracket = { "]" }
 
+BackQuote = { "`" }
 At        = { "@" }
 Pound     = { "#" }
 Tilde     = { "~" }
@@ -147,6 +148,7 @@ Token = {
   | CloseBrace
   | OpenBracket
   | CloseBracket
+  | BackQuote
   | At
   | Pound
   | Tilde

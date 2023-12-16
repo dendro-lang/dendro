@@ -111,11 +111,12 @@ mod tests {
     #[test]
     fn all() {
         let s = r#"/// Wow!
-main = println /* on console */ "Hello, {} {}!" 0x2a 2.5f64;
+let main = println /* on console */ "Hello, {} {}!" 0x2a 2.5f64;
 // End of input.
 "#;
         let mut p = parse(s).unwrap();
         assert_eq!(p.next().unwrap().as_str(), "/// Wow!");
+        assert_eq!(p.next().unwrap().as_str(), "let");
         assert_eq!(p.next().unwrap().as_str(), "main");
         assert_eq!(p.next().unwrap().as_str(), "=");
         assert_eq!(p.next().unwrap().as_str(), "println");

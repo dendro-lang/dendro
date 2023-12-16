@@ -1,5 +1,7 @@
 use dendro_span::{span::Span, symbol::Symbol};
 
+use crate::ast::AttrStyle;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     // Expression-operator symbols.
@@ -25,6 +27,8 @@ pub enum TokenKind {
     Not,
     /// `~`
     Tilde,
+    /// `\``
+    BackQuote,
 
     BinOp(BinOpToken),
     BinOpEq(BinOpToken),
@@ -97,12 +101,6 @@ pub enum CommentKind {
     Block,
 }
 pub use CommentKind::*;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AttrStyle {
-    Outer,
-    Inner,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinOpToken {
@@ -215,14 +213,14 @@ impl Token {
                 _ => return None,
             },
             SingleQuote => match joint.kind {
-                Ident(name, false) => Lifetime(Symbol::new_owned(format!("'{name}"))),
+                Ident(name, false) => Lifetime(name),
                 _ => return None,
             },
 
-            Le | EqEq | Ne | Ge | AndAnd | OrOr | Tilde | BinOpEq(..) | At | DotDotDot
-            | DotDotEq | Comma | Semi | ColonColon | RArrow | LArrow | FatArrow | Pound
-            | Dollar | Question | OpenDelim(..) | CloseDelim(..) | Literal(..) | Ident(..)
-            | Lifetime(..) | DocComment(..) => return None,
+            Le | EqEq | Ne | Ge | AndAnd | OrOr | Tilde | BinOpEq(..) | BackQuote | At
+            | DotDotDot | DotDotEq | Comma | Semi | ColonColon | RArrow | LArrow | FatArrow
+            | Pound | Dollar | Question | OpenDelim(..) | CloseDelim(..) | Literal(..)
+            | Ident(..) | Lifetime(..) | DocComment(..) => return None,
         };
 
         Some(Token::new(kind, self.span.to(&joint.span)))

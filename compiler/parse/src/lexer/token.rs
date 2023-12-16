@@ -1,5 +1,6 @@
 use dendro_ast::{
-    token::{self, AttrStyle, CommentKind, Lit, LitKind, Token},
+    ast::AttrStyle,
+    token::{self, CommentKind, Lit, LitKind, Token},
     token_stream::Spacing,
 };
 use dendro_lexer::Rule;
@@ -101,6 +102,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) 
         Rule::CloseBrace => token::CloseDelim(token::Brace),
         Rule::OpenBracket => token::OpenDelim(token::Bracket),
         Rule::CloseBracket => token::CloseDelim(token::Bracket),
+        Rule::BackQuote => token::BackQuote,
         Rule::At => token::At,
         Rule::Pound => token::Pound,
         Rule::Tilde => token::Tilde,

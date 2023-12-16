@@ -2,23 +2,31 @@ use std::{fmt, ptr::NonNull};
 
 use strpool::Pool;
 
+use crate::ident::SYMBOL_PREFILL;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Symbol(NonNull<str>);
+pub enum Symbol {
+    Interned(NonNull<str>),
+    Const(usize),
+}
 
 unsafe impl Send for Symbol {}
 unsafe impl Sync for Symbol {}
 
 impl Symbol {
-    pub fn new(s: &str) -> Self {
-        Symbol(NonNull::from(&*Pool::get_static_pool().intern(s)))
+    pub(crate) const fn prefill(index: usize) -> Self {
+        Self::Const(index)
     }
 
-    pub fn new_owned(s: String) -> Self {
-        Self::new(&s)
+    pub fn new(s: &str) -> Self {
+        Symbol::Interned(NonNull::from(&*Pool::get_static_pool().intern(s)))
     }
 
     pub fn as_str(&self) -> &str {
-        unsafe { self.0.as_ref() }
+        match *self {
+            Symbol::Const(index) => SYMBOL_PREFILL[index],
+            Symbol::Interned(ptr) => unsafe { ptr.as_ref() },
+        }
     }
 }
 
