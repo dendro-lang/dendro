@@ -9,13 +9,17 @@ macro_rules! keywords {
     [$($name:ident: $value:literal),* $(,)?] => {
         pub(crate) const SYMBOL_PREFILL: &[&str] = &[
             $($value),*
-        ];
+        ]; 
 
         pub mod keywords {
             use crate::symbol::Symbol;
             $(
                 pub const $name: Symbol = Symbol::prefill(${index()});
             )*
+
+            pub(crate) static MAP: phf::Map<&str, Symbol> = phf::phf_map! {
+                $($value => $name,)*
+            };
         }
     };
 }
@@ -72,6 +76,10 @@ impl Ident {
 
     pub fn as_str(&self) -> &str {
         self.name.as_str()
+    }
+
+    pub fn is_keyword(&self) -> bool {
+        keywords::MAP.contains_key(self.as_str())
     }
 }
 

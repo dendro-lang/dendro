@@ -3,9 +3,11 @@ use dendro_ast::{
     token::{self, CommentKind, Lit, LitKind, Token},
     token_stream::Spacing,
 };
-use dendro_lexer::Rule;
+use dendro_error::Error;
 use dendro_span::symbol::Symbol;
-use pest::{error::Error, iterators::Pair, Span};
+use pest::{iterators::Pair, Span};
+
+use crate::imp::Rule;
 
 pub struct Tokens<'i, I>
 where
@@ -15,10 +17,8 @@ where
     last_span: Option<Span<'i>>,
 }
 
-pub fn parse(
-    input: &str,
-) -> Result<Tokens<'_, impl Iterator<Item = Pair<'_, Rule>> + '_>, Box<Error<Rule>>> {
-    dendro_lexer::parse(input).map(|iter| Tokens {
+pub fn parse(input: &str) -> Result<Tokens<'_, impl Iterator<Item = Pair<'_, Rule>> + '_>, Error> {
+    crate::imp::parse(input).map(|iter| Tokens {
         iter,
         last_span: None,
     })
@@ -103,6 +103,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) 
         Rule::OpenBracket => token::OpenDelim(token::Bracket),
         Rule::CloseBracket => token::CloseDelim(token::Bracket),
         Rule::BackQuote => token::BackQuote,
+        Rule::BackSlash => token::BackSlash,
         Rule::At => token::At,
         Rule::Pound => token::Pound,
         Rule::Tilde => token::Tilde,
@@ -119,7 +120,6 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) 
         Rule::Plus => token::BinOp(token::Plus),
         Rule::Star => token::BinOp(token::Star),
         Rule::Slash => token::BinOp(token::Slash),
-        Rule::BackSlash => token::BinOp(token::BackSlash),
         Rule::Percent => token::BinOp(token::Percent),
         Rule::Caret => token::BinOp(token::Caret),
         _ => unreachable!(),

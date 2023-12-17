@@ -1,14 +1,13 @@
-use std::error::Error;
-
 use dendro_ast::{
     token::{self, Token},
     token_stream::{Spacing, TokenStream, TokenTree},
 };
-use dendro_lexer::Rule;
+use dendro_error::{Diagnostic, Error};
 use dendro_span::span::DelimSpan;
 use pest::iterators::Pair;
 
 use super::token::Tokens;
+use crate::imp::Rule;
 
 pub(crate) struct TokenTrees<'i, I>
 where
@@ -29,7 +28,7 @@ where
         }
     }
 
-    fn next_token_tree(&mut self) -> Result<(TokenTree, Spacing), Box<dyn Error>> {
+    fn next_token_tree(&mut self) -> Result<(TokenTree, Spacing), Error> {
         match self.current {
             Some(token) => match token.kind {
                 token::OpenDelim(delim) => {
@@ -38,9 +37,12 @@ where
 
                     let inner = self.token_trees_until_close_delim()?;
                     let Some(current) = self.current else {
-                        return Err(
-                            format!("unclosed delimiter {delim:?} at {open:?}; found EOF").into(),
-                        );
+                        return Err(Diagnostic::error(None, true)
+                            .push_spanned_fmt(
+                                open,
+                                format_args!("unclosed delimiter {delim:?}; found unexpected EOF"),
+                            )
+                            .report_fatal());
                     };
                     let close = current.span;
                     match current.kind {
@@ -48,10 +50,14 @@ where
                             self.bump();
                         }
                         token::TokenKind::CloseDelim(d) => {
-                            let msg = format!(
-                                "unclosed delimiter {delim:?} at {open:?}; found {d:?} at {close:?}"
-                            );
-                            return Err(msg.into());
+                            self.bump();
+                            return Err(Diagnostic::error(None, true)
+                                .push_spanned_fmt(
+                                    open,
+                                    format_args!("unclosed delimiter {delim:?}"),
+                                )
+                                .push_spanned_fmt(close, format_args!("found {d:?}"))
+                                .report_fatal());
                         }
                         _ => unreachable!(),
                     }
@@ -76,7 +82,7 @@ where
         spacing
     }
 
-    fn token_trees_until_close_delim(&mut self) -> Result<TokenStream, Box<dyn Error>> {
+    fn token_trees_until_close_delim(&mut self) -> Result<TokenStream, Error> {
         let mut vec = TokenStreamBuilder::new();
         loop {
             let is_eof_or_close = matches!(
@@ -93,7 +99,7 @@ where
         }
     }
 
-    pub fn parse(mut self) -> Result<TokenStream, Box<dyn Error>> {
+    pub fn parse(mut self) -> Result<TokenStream, Error> {
         let mut vec = TokenStreamBuilder::new();
         self.bump();
         while self.current.is_some() {

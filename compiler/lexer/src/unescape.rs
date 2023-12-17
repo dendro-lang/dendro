@@ -2,7 +2,7 @@ use std::str::Chars;
 
 use pest::Span;
 
-use crate::Rule;
+use crate::imp::Rule;
 
 /// Errors and warnings that can occur during string unescaping.
 #[derive(Debug, PartialEq, Eq)]

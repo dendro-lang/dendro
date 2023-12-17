@@ -2,12 +2,18 @@ use std::{fmt, ptr::NonNull};
 
 use strpool::Pool;
 
-use crate::ident::SYMBOL_PREFILL;
+use crate::ident::{SYMBOL_PREFILL, keywords};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Symbol {
     Interned(NonNull<str>),
     Const(usize),
+}
+
+impl fmt::Debug for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
 }
 
 unsafe impl Send for Symbol {}
@@ -27,6 +33,10 @@ impl Symbol {
             Symbol::Const(index) => SYMBOL_PREFILL[index],
             Symbol::Interned(ptr) => unsafe { ptr.as_ref() },
         }
+    }
+
+    pub fn is_keyword(&self) -> bool {
+        keywords::MAP.contains_key(self.as_str())
     }
 }
 

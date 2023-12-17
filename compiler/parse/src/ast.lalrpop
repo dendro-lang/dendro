@@ -1,0 +1,78 @@
+use dendro_ast::{ast::*, token, token_stream::*};
+use dendro_span::{span::*, symbol::*};
+
+use crate::imp::Unspanned::{self, *};
+
+grammar;
+
+extern {
+    type Location = Pos;
+    type Error = dendro_error::Error;
+
+    enum Unspanned {
+        "delim" => Delimited(<token::Delimiter>, <TokenStream>),
+
+        "=" => Single(token::Eq),
+        "<" => Single(token::Lt),
+        "<=" => Single(token::Le),
+        "==" => Single(token::EqEq),
+        "!=" => Single(token::Ne),
+        ">=" => Single(token::Ge),
+        ">" => Single(token::Gt),
+        "&&" => Single(token::AndAnd),
+        "||" => Single(token::OrOr),
+        "!" => Single(token::Not),
+        "~" => Single(token::Tilde),
+        "`" => Single(token::BackQuote),
+        "\\" => Single(token::BackSlash),
+
+        "+" => Single(token::BinOp(token::Plus)),
+        "-" => Single(token::BinOp(token::Minus)),
+        "*" => Single(token::BinOp(token::Star)),
+        "/" => Single(token::BinOp(token::Slash)),
+        "%" => Single(token::BinOp(token::Percent)),
+        "^" => Single(token::BinOp(token::Caret)),
+        "&" => Single(token::BinOp(token::And)),
+        "|" => Single(token::BinOp(token::Or)),
+        "<<" => Single(token::BinOp(token::Shl)),
+        ">>" => Single(token::BinOp(token::Shr)),
+
+        "+=" => Single(token::BinOpEq(token::Plus)),
+        "-=" => Single(token::BinOpEq(token::Minus)),
+        "*=" => Single(token::BinOpEq(token::Star)),
+        "/=" => Single(token::BinOpEq(token::Slash)),
+        "%=" => Single(token::BinOpEq(token::Percent)),
+        "^=" => Single(token::BinOpEq(token::Caret)),
+        "&=" => Single(token::BinOpEq(token::And)),
+        "|=" => Single(token::BinOpEq(token::Or)),
+        "<<=" => Single(token::BinOpEq(token::Shl)),
+        ">>=" => Single(token::BinOpEq(token::Shr)),
+
+        "@" => Single(token::At),
+        "." => Single(token::Dot),
+        ".." => Single(token::DotDot),
+        "..." => Single(token::DotDotDot),
+        "..=" => Single(token::DotDotEq),
+        "," => Single(token::Comma),
+        ";" => Single(token::Semi),
+        ":" => Single(token::Colon),
+        "::" => Single(token::ColonColon),
+        "->" => Single(token::RArrow),
+        "<-" => Single(token::LArrow),
+        "=>" => Single(token::FatArrow),
+        "#" => Single(token::Pound),
+        "$" => Single(token::Dollar),
+        "?" => Single(token::Question),
+        "'" => Single(token::SingleQuote),
+
+        "literal" => Single(token::Literal(<token::Lit>)),
+        "ident" => Single(token::Ident(<Symbol>, <bool>)),
+        "lifetime" => Single(token::Lifetime(<Symbol>)),
+        "doc" => Single(token::DocComment(<token::CommentKind>, <AttrStyle>, <Symbol>)),
+    }
+}
+
+pub Expr: P<Expr> = {
+    <delim:"delim"> =>? super::parse_delim(delim.0, delim.1),
+    <lo:@L> <ident:"ident"> <hi:@R> =>? super::parse_ident(Span::new(lo, hi), ident.0, ident.1),
+}
