@@ -1,6 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Item, Lifetime, Pat, Path, Spanned, Visibility, P};
+use super::{Item, Lifetime, Mutability, Pat, Path, Spanned, Visibility, P};
 use crate::token;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -43,6 +43,8 @@ pub enum BinOpKind {
     Gt,
     /// `.`
     Infix,
+    /// `:`
+    BelongsTo,
 }
 
 pub type BinOp = Spanned<BinOpKind>;
@@ -55,29 +57,21 @@ pub enum UnOpKind {
     Not,
     /// `-`
     Neg,
+    /// `exists`
+    Exists,
 }
 
 pub type UnOp = Spanned<UnOpKind>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Prerequisites {
-    pub for_all: Vec<Ident>,
+    pub forall: Vec<Ident>,
     pub where_clause: Vec<P<Expr>>,
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MutabilityKind {
-    Const,
-    Mut,
-    Move,
-}
-
-pub type Mutability = Spanned<MutabilityKind>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Let {
-    pub prerequisites: Prerequisites,
     pub visibility: Visibility,
     pub pat: P<Pat>,
     pub expr: P<Expr>,
@@ -100,7 +94,7 @@ pub enum RangeLimits {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct StructField {
+pub struct ExprField {
     pub prerequisites: Prerequisites,
     pub visibility: Visibility,
     pub lhs: P<Expr>,
@@ -111,7 +105,7 @@ pub struct StructField {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
     pub id: u32,
-    pub stmts: Vec<Stmt>,
+    pub items: Vec<Item>,
     pub is_unsafe: bool,
     pub span: Span,
 }
@@ -120,10 +114,14 @@ pub struct Block {
 pub enum ExprKind {
     /// `ident`
     Ident(Ident),
-    /// `forall a where a > 1: let x a = a`
+    /// `"abcde"`
+    Literal(token::Lit, Span),
+    /// `some::module::item`
+    Path(Path),
+    /// `forall a where a > 1 :: expr`
+    Prereq(Prerequisites, P<Expr>),
+    /// `let x a = a`
     Let(Let),
-    /// `exists expr`
-    Exists(Prerequisites, P<Expr>),
     /// `if predicate then body else other`
     If(P<Expr>, P<Expr>, Option<P<Expr>>),
     /// `while predicate do body`
@@ -131,10 +129,10 @@ pub enum ExprKind {
     /// `loop body`
     Loop(P<Expr>),
     /// `for item in expr do body`
-    For(P<Pat>, P<Expr>, P<Expr>),
+    ForLoop(P<Pat>, P<Expr>, P<Expr>),
     /// `match predicate on { arms.. }`
     Match(P<Expr>, Vec<MatchArm>),
-    /// `&'lifetime mutability expr`
+    /// `&'lifetime #mutability expr`
     Deref(Option<Lifetime>, Mutability, P<Expr>),
     /// `a + b`
     Binary(P<Expr>, BinOp, P<Expr>),
@@ -146,16 +144,14 @@ pub enum ExprKind {
     ArrayRepeated(P<Expr>, P<Expr>),
     /// `(a, b, c)`
     Tuple(Vec<(Visibility, P<Expr>)>),
-    /// `@{ x = a; y = { b } z = c; }`
-    Struct(Vec<StructField>),
-    /// `"abcde"`
-    Literal(token::Lit, Span),
+    /// `Struct { x = a; y = { b } z = c; }`
+    Struct(Ident, Vec<ExprField>),
     /// `'life: expr`
     Annotated(Lifetime, P<Expr>),
     /// `{ expr }` or `unsafe { expr }`
     Block(P<Block>),
-    /// `forall a where a > 1: a -> body`
-    Lambda(Prerequisites, P<Pat>, P<Expr>),
+    /// `param -> body`
+    Lambda(P<Pat>, P<Expr>),
     /// `lhs = rhs`
     ///
     /// `span` is the span of `=`.
@@ -166,8 +162,6 @@ pub enum ExprKind {
     Range(Option<P<Expr>>, RangeLimits, Option<P<Expr>>),
     /// `_`
     Underscore,
-    /// `some::module::item`
-    Path(Path),
     /// `break 'outer value`
     Break(Option<Lifetime>, Option<P<Expr>>),
     /// `continue 'outer`
@@ -184,23 +178,5 @@ pub enum ExprKind {
 pub struct Expr {
     pub id: u32,
     pub kind: ExprKind,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum StmtKind {
-    Item(P<Item>),
-    /// `expr;`
-    Expr(P<Expr>),
-    /// `expr`
-    Semi(P<Expr>),
-    /// `;`
-    Empty,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Stmt {
-    pub id: u32,
-    pub kind: StmtKind,
     pub span: Span,
 }

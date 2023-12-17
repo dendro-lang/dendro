@@ -12,6 +12,12 @@ pub struct Lifetime {
     pub ident: Ident,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Mutability {
+    pub id: u32,
+    pub ident: Ident,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path {
     pub span: Span,

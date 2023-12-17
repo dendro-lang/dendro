@@ -29,8 +29,8 @@ pub enum PatKind {
     Array(Vec<P<Pat>>),
     /// `(a, b, c)`
     Tuple(Vec<P<Pat>>),
-    /// `@{ a = x; b; c }`
-    Struct(Vec<PatField>),
+    /// `Struct { a = x; b; c }`
+    Struct(Ident, Vec<PatField>),
     /// `A | B`
     Or(Vec<P<Pat>>),
     /// `some::module::item`

@@ -52,9 +52,16 @@ pub struct UseTree {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ItemKind {
+    /// `mod abc;` or `mod abc {}`
     Module(Ident, ModuleKind),
+    /// `use prefix::{a, b, c};`
     Use(UseTree),
-    Let(Let),
+    /// `expr;`
+    Expr(P<Expr>),
+    /// `expr`
+    Semi(P<Expr>),
+    /// `;`
+    Empty,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
