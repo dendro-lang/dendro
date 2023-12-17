@@ -3,6 +3,7 @@ use dendro_span::{ident::Ident, span::Span};
 use super::{Attribute, BinOp, Expr, Lifetime, Mutability, Path, RangeLimits, P};
 use crate::token;
 
+/// `#[attrs] ident = pat`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PatField {
     pub attrs: Vec<Attribute>,

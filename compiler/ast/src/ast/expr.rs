@@ -1,6 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, Item, Lifetime, Mutability, Pat, Path, Spanned, Visibility, P};
+use super::{Attribute, Lifetime, Mutability, Pat, Path, Spanned, Stmt, Visibility, P};
 use crate::token;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -63,6 +63,7 @@ pub enum UnOpKind {
 
 pub type UnOp = Spanned<UnOpKind>;
 
+/// `forall a where a > 1 ::`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Prerequisites {
     pub forall: Vec<Ident>,
@@ -70,13 +71,16 @@ pub struct Prerequisites {
     pub span: Span,
 }
 
+/// `pub let x a = a`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Let {
+    pub attrs: Vec<Attribute>,
     pub visibility: Visibility,
     pub pat: P<Pat>,
     pub expr: P<Expr>,
 }
 
+/// `pat => expr`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MatchArm {
     pub prerequisites: Prerequisites,
@@ -94,6 +98,7 @@ pub enum RangeLimits {
     Closed,
 }
 
+/// `#[attrs] pub expr`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TupleField {
     pub prerequisites: Prerequisites,
@@ -102,6 +107,7 @@ pub struct TupleField {
     pub expr: P<Expr>,
 }
 
+/// `#[attrs] pub pat = expr`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StructField {
     pub prerequisites: Prerequisites,
@@ -114,11 +120,23 @@ pub struct StructField {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BlockKind {
+    /// { stmts } or from another loaded file.
+    Loaded {
+        stmts: Vec<P<Stmt>>,
+        is_inline: bool,
+        /// Excluding the braces.
+        span: Span,
+    },
+    /// From another file which is not loaded yet.
+    Unloaded,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
     pub id: u32,
-    pub items: Vec<Item>,
+    pub kind: BlockKind,
     pub is_unsafe: bool,
-    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

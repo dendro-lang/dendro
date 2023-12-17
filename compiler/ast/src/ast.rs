@@ -25,8 +25,11 @@ pub struct Spanned<T> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum VisibilityKind {
+    /// `pub`
     Public,
+    /// Inherited
     Inherited,
+    /// `pub(in path)`
     Restricted { path: P<Path>, id: u32 },
 }
 
@@ -34,15 +37,25 @@ pub type Visibility = Spanned<VisibilityKind>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AttrArgs {
+    /// `#[attr]`
     Empty,
+    /// `#[attr(tt..)]`
     Delimited(DelimSpan, Delimiter, TokenStream),
+    /// `#[attr = expr]`
     Eq(Span, P<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AttrKind {
     Normal(Path, AttrArgs),
+    /// `///`, `//!`, `/** */` or `/*! */` => `#[doc = ""]`
     Comment(CommentKind, Symbol),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AttrStyle {
+    Outer,
+    Inner,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -52,22 +65,13 @@ pub struct Attribute {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Inline {
-    Yes,
-    No,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ModuleKind {
-    Loaded(Vec<P<Item>>, Inline, Span),
-    Unloaded,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum UseTreeKind {
+    /// `use prefix::ident`
     Simple(Option<Ident>),
+    /// `use prefix::{nested..}`
     Nested(Vec<UseTree>),
+    /// `use prefix::*`
     Glob,
 }
 
@@ -79,11 +83,9 @@ pub struct UseTree {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ItemKind {
-    /// `mod abc;` or `mod abc {}`
-    Module(Ident, ModuleKind),
+pub enum StmtKind {
     /// `use prefix::{a, b, c};`
-    Use(UseTree),
+    Use(Visibility, UseTree),
     /// `expr;`
     Expr(P<Expr>),
     /// `expr`
@@ -93,14 +95,17 @@ pub enum ItemKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Item {
+pub struct Stmt {
     pub id: u32,
-    pub kind: ItemKind,
+    pub kind: StmtKind,
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AttrStyle {
-    Outer,
-    Inner,
+/// A binary unit: library/executable.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Leaf {
+    pub id: u32,
+    pub attrs: Vec<Attribute>,
+    pub stmts: Vec<P<Stmt>>,
+    pub span: Span,
 }
