@@ -65,3 +65,30 @@ impl Span {
         Span::new(self.end, other.start)
     }
 }
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct DelimSpan {
+    pub open: Span,
+    pub close: Span,
+}
+
+impl DelimSpan {
+    pub fn from_single(sp: Span) -> Self {
+        DelimSpan {
+            open: sp,
+            close: sp,
+        }
+    }
+
+    pub fn from_pair(open: Span, close: Span) -> Self {
+        DelimSpan { open, close }
+    }
+
+    pub fn dummy() -> Self {
+        Self::from_single(DUMMY_SPAN)
+    }
+
+    pub fn entire(self) -> Span {
+        self.open.to(&self.close)
+    }
+}

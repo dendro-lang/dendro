@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use dendro_span::span::Span;
+use dendro_span::span::DelimSpan;
 use smallvec::SmallVec;
 
 use crate::token::{Delimiter, Token};
@@ -8,12 +8,7 @@ use crate::token::{Delimiter, Token};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TokenTree {
     Token(Token),
-    Delimited {
-        open: Span,
-        close: Span,
-        delim: Delimiter,
-        inner: TokenStream,
-    },
+    Delimited(DelimSpan, Delimiter, TokenStream),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

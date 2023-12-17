@@ -5,6 +5,7 @@ use dendro_ast::{
     token_stream::{Spacing, TokenStream, TokenTree},
 };
 use dendro_lexer::Rule;
+use dendro_span::span::DelimSpan;
 use pest::iterators::Pair;
 
 use super::token::Tokens;
@@ -55,12 +56,8 @@ where
                         _ => unreachable!(),
                     }
 
-                    let delimited = TokenTree::Delimited {
-                        open,
-                        close,
-                        delim,
-                        inner,
-                    };
+                    let delimited =
+                        TokenTree::Delimited(DelimSpan::from_pair(open, close), delim, inner);
                     Ok(delimited.into())
                 }
                 token::CloseDelim(_) => unreachable!(),

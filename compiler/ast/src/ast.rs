@@ -3,9 +3,17 @@ mod ident;
 mod pat;
 mod pointer;
 
-use dendro_span::{ident::Ident, span::Span};
+use dendro_span::{
+    ident::Ident,
+    span::{DelimSpan, Span},
+    symbol::Symbol,
+};
 
 pub use self::{expr::*, ident::*, pat::*, pointer::P};
+use crate::{
+    token::{CommentKind, Delimiter},
+    token_stream::TokenStream,
+};
 
 pub const DUMMY_ID: u32 = u32::MAX;
 
@@ -23,6 +31,26 @@ pub enum VisibilityKind {
 }
 
 pub type Visibility = Spanned<VisibilityKind>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AttrArgs {
+    Empty,
+    Delimited(DelimSpan, Delimiter, TokenStream),
+    Eq(Span, P<Expr>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AttrKind {
+    Normal(Path, AttrArgs),
+    Comment(CommentKind, Symbol),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Attribute {
+    pub id: u32,
+    pub style: AttrStyle,
+    pub span: Span,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Inline {

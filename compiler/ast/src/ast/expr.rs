@@ -1,34 +1,34 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Item, Lifetime, Mutability, Pat, Path, Spanned, Visibility, P};
+use super::{Attribute, Item, Lifetime, Mutability, Pat, Path, Spanned, Visibility, P};
 use crate::token;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BinOpKind {
-    /// `+`
-    Add,
-    /// `-`
-    Sub,
+    /// `.`
+    Infix,
+    /// `:`
+    BelongsTo,
     /// `*`
     Mul,
     /// `/`
     Div,
     /// `%`
     Rem,
-    /// `&&`
-    And,
-    /// `||`
-    Or,
+    /// `+`
+    Add,
+    /// `-`
+    Sub,
+    /// `<<`
+    Shl,
+    /// `>>`
+    Shr,
     /// `^`
     BitXor,
     /// `&`
     BitAnd,
     /// `|`
     BitOr,
-    /// `<<`
-    Shl,
-    /// `>>`
-    Shr,
     /// `==`
     Eq,
     /// `<`
@@ -41,10 +41,10 @@ pub enum BinOpKind {
     Ge,
     /// `>`
     Gt,
-    /// `.`
-    Infix,
-    /// `:`
-    BelongsTo,
+    /// `&&`
+    And,
+    /// `||`
+    Or,
 }
 
 pub type BinOp = Spanned<BinOpKind>;
@@ -80,6 +80,7 @@ pub struct Let {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MatchArm {
     pub prerequisites: Prerequisites,
+    pub attrs: Vec<Attribute>,
     pub pat: P<Pat>,
     pub guard: Option<P<Expr>>,
     pub expr: P<Expr>,
@@ -94,12 +95,22 @@ pub enum RangeLimits {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ExprField {
+pub struct TupleField {
     pub prerequisites: Prerequisites,
+    pub attrs: Vec<Attribute>,
     pub visibility: Visibility,
-    pub lhs: P<Expr>,
+    pub expr: P<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct StructField {
+    pub prerequisites: Prerequisites,
+    pub attrs: Vec<Attribute>,
+    pub id: u32,
     pub span: Span,
-    pub rhs: P<Expr>,
+    pub visibility: Visibility,
+    pub pat: P<Pat>,
+    pub expr: P<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -134,18 +145,18 @@ pub enum ExprKind {
     Match(P<Expr>, Vec<MatchArm>),
     /// `&'lifetime #mutability expr`
     Deref(Option<Lifetime>, Mutability, P<Expr>),
-    /// `a + b`
-    Binary(P<Expr>, BinOp, P<Expr>),
     /// `!a`
     Unary(UnOp, P<Expr>),
+    /// `a + b`
+    Binary(P<Expr>, BinOp, P<Expr>),
     /// `[a, b, c]`
     Array(Vec<P<Expr>>),
     /// `[repeated; count]`
     ArrayRepeated(P<Expr>, P<Expr>),
     /// `(a, b, c)`
-    Tuple(Vec<(Visibility, P<Expr>)>),
+    Tuple(Vec<TupleField>),
     /// `Struct { x = a; y = { b } z = c; }`
-    Struct(Ident, Vec<ExprField>),
+    Struct(Ident, Vec<StructField>),
     /// `'life: expr`
     Annotated(Lifetime, P<Expr>),
     /// `{ expr }` or `unsafe { expr }`
@@ -155,7 +166,9 @@ pub enum ExprKind {
     /// `lhs = rhs`
     ///
     /// `span` is the span of `=`.
-    Assignment(P<Expr>, Span, P<Expr>),
+    Assign(P<Expr>, Span, P<Expr>),
+    /// `lhs += rhs`
+    AssignOp(P<Expr>, BinOp, P<Expr>),
     /// `slice[index]`
     Index(P<Expr>, P<Expr>),
     /// `start..end` or `start..=end`
@@ -179,4 +192,5 @@ pub struct Expr {
     pub id: u32,
     pub kind: ExprKind,
     pub span: Span,
+    pub attrs: Vec<Attribute>,
 }
