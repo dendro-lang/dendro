@@ -1,4 +1,4 @@
-use std::{convert::Infallible, str::FromStr};
+use std::{convert::Infallible, fmt, str::FromStr};
 
 use crate::{
     span::{Span, DUMMY_SPAN},
@@ -9,9 +9,9 @@ macro_rules! keywords {
     [$($name:ident: $value:literal),* $(,)?] => {
         pub(crate) const SYMBOL_PREFILL: &[&str] = &[
             $($value),*
-        ]; 
+        ];
 
-        pub mod keywords {
+        pub mod kw {
             use crate::symbol::Symbol;
             $(
                 pub const $name: Symbol = Symbol::prefill(${index()});
@@ -67,7 +67,7 @@ impl Ident {
     }
 
     pub const fn empty() -> Self {
-        Self::with_dummy_span(keywords::EMPTY)
+        Self::with_dummy_span(kw::EMPTY)
     }
 
     pub fn with_span(self, span: Span) -> Self {
@@ -79,7 +79,17 @@ impl Ident {
     }
 
     pub fn is_keyword(&self) -> bool {
-        keywords::MAP.contains_key(self.as_str())
+        self.name.is_keyword()
+    }
+
+    pub fn is(&self, other: Symbol) -> bool {
+        self.name == other
+    }
+}
+
+impl fmt::Display for Ident {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
     }
 }
 

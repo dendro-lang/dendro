@@ -2,7 +2,7 @@ use std::{fmt, ptr::NonNull};
 
 use strpool::Pool;
 
-use crate::ident::{SYMBOL_PREFILL, keywords};
+use crate::ident::{kw, SYMBOL_PREFILL};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Symbol {
@@ -36,7 +36,7 @@ impl Symbol {
     }
 
     pub fn is_keyword(&self) -> bool {
-        keywords::MAP.contains_key(self.as_str())
+        kw::MAP.contains_key(self.as_str())
     }
 }
 

@@ -1,16 +1,18 @@
-lalrpop_mod!(#[allow(unused_imports)] ast, "/src/ast.rs");
+lalrpop_mod!(
+    #[allow(unused_imports)]
+    ast,
+    "/src/ast.rs"
+);
+
+mod ident;
 
 use dendro_ast::{
-    ast::{Expr, ExprKind, DUMMY_ID, P},
+    ast::{Expr, P},
     token::{Delimiter, Token, TokenKind},
     token_stream::{Cursor, TokenStream, TokenTree},
 };
-use dendro_error::{Diagnostic, Error};
-use dendro_span::{
-    ident::Ident,
-    span::{Pos, Span},
-    symbol::Symbol,
-};
+use dendro_error::Error;
+use dendro_span::span::Pos;
 use lalrpop_util::lalrpop_mod;
 
 type ParseError = lalrpop_util::ParseError<Pos, Unspanned, Error>;
@@ -41,27 +43,8 @@ impl Iterator for LalrpopIter {
     }
 }
 
-fn parse_delim(_delim: Delimiter, _ts: TokenStream) -> Result<P<Expr>, ParseError> {
+fn parse_delim((_delim, _tt): (Delimiter, TokenStream)) -> Result<P<Expr>, ParseError> {
     todo!()
-}
-
-fn parse_ident(span: Span, sym: Symbol, is_raw: bool) -> Result<P<Expr>, ParseError> {
-    if !is_raw && sym.is_keyword() {
-        Diagnostic::error(None, false)
-            .push_spanned_fmt(
-                span,
-                format_args!(
-                    "`{sym}` is a keyword; try to use another identifier, or prefix it with `r#`"
-                ),
-            )
-            .report()?;
-    }
-    Ok(P(Expr {
-        id: DUMMY_ID,
-        kind: ExprKind::Ident(Ident::new(sym, span)),
-        span,
-        attrs: vec![],
-    }))
 }
 
 #[cfg(test)]

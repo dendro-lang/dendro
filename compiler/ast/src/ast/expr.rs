@@ -144,7 +144,7 @@ pub enum ExprKind {
     /// `ident`
     Ident(Ident),
     /// `"abcde"`
-    Literal(token::Lit, Span),
+    Literal(token::Lit),
     /// `some::module::item`
     Path(Path),
     /// `forall a where a > 1 :: expr`

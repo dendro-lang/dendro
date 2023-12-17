@@ -74,7 +74,7 @@ impl Diagnostic {
         Self::new(Level::Info)
     }
 
-    pub fn push(&mut self, message: &str) -> &mut Self {
+    pub fn push_unspanned(&mut self, message: &str) -> &mut Self {
         self.messages.push(DiagUnit {
             span: None,
             message: Intern::from_ref(message),
@@ -82,7 +82,7 @@ impl Diagnostic {
         self
     }
 
-    pub fn push_spanned(&mut self, span: Span, message: &str) -> &mut Self {
+    pub fn push(&mut self, span: Span, message: &str) -> &mut Self {
         self.messages.push(DiagUnit {
             span: Some(span),
             message: Intern::from_ref(message),
@@ -90,7 +90,7 @@ impl Diagnostic {
         self
     }
 
-    pub fn push_fmt(&mut self, args: fmt::Arguments) -> &mut Self {
+    pub fn push_unspanned_fmt(&mut self, args: fmt::Arguments) -> &mut Self {
         self.messages.push(DiagUnit {
             span: None,
             message: Intern::new(format!("{args}")),
@@ -98,7 +98,7 @@ impl Diagnostic {
         self
     }
 
-    pub fn push_spanned_fmt(&mut self, span: Span, args: fmt::Arguments) -> &mut Self {
+    pub fn push_fmt(&mut self, span: Span, args: fmt::Arguments) -> &mut Self {
         self.messages.push(DiagUnit {
             span: Some(span),
             message: Intern::new(format!("{args}")),
@@ -116,7 +116,7 @@ impl Diagnostic {
         }
     }
 
-    pub fn report_fatal(&mut self) -> Error {
+    pub fn into_err(&mut self) -> Error {
         Error(vec![mem::take(self)])
     }
 }

@@ -218,10 +218,10 @@ impl Token {
                 _ => return None,
             },
 
-            Le | EqEq | Ne | Ge | AndAnd | BackSlash | OrOr | Tilde | BinOpEq(..) | BackQuote | At
-            | DotDotDot | DotDotEq | Comma | Semi | ColonColon | RArrow | LArrow | FatArrow
-            | Pound | Dollar | Question | OpenDelim(..) | CloseDelim(..) | Literal(..)
-            | Ident(..) | Lifetime(..) | DocComment(..) => return None,
+            Le | EqEq | Ne | Ge | AndAnd | BackSlash | OrOr | Tilde | BinOpEq(..) | BackQuote
+            | At | DotDotDot | DotDotEq | Comma | Semi | ColonColon | RArrow | LArrow
+            | FatArrow | Pound | Dollar | Question | OpenDelim(..) | CloseDelim(..)
+            | Literal(..) | Ident(..) | Lifetime(..) | DocComment(..) => return None,
         };
 
         Some(Token::new(kind, self.span.to(&joint.span)))

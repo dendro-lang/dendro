@@ -1,7 +1,7 @@
 use dendro_ast::{ast::*, token, token_stream::*};
-use dendro_span::{span::*, symbol::*};
+use dendro_span::{span::*, symbol::*, ident::*};
 
-use crate::imp::Unspanned::{self, *};
+use crate::imp::{Unspanned::*, *};
 
 grammar;
 
@@ -72,7 +72,50 @@ extern {
     }
 }
 
+// ------------------------------------------
+// Identifiers
+
+pub Ident: Ident = {
+    <lo:@L> <ident:"ident"> <hi:@R> =>? ident::parse_ident(Span::new(lo, hi), ident),
+}
+
+pub Lifetime: Lifetime = {
+    <lo:@L> <lifetime:"lifetime"> <hi:@R> => Lifetime {
+        id: DUMMY_ID,
+        ident: Ident::new(lifetime, Span::new(lo, hi)),
+    }
+}
+
+pub Mutability: Mutability = {
+    "#" <ident:Ident> =>? ident::parse_mutability(ident, true),
+    <ident:Ident> =>? ident::parse_mutability(ident, false),
+}
+
+pub Path: Path = {
+    <lo:@L> <root:"::"?> <hi:@R> <first:Ident> <segments:("::" <Ident>)*> => {
+        root.map(|_| PathSegment::root(Span::new(lo, hi)))
+            .into_iter()
+            .chain([first].into_iter().chain(segments).map(Into::into))
+            .collect()
+    }
+}
+
+// ------------------------------------------
+// Expressions
+
 pub Expr: P<Expr> = {
-    <delim:"delim"> =>? super::parse_delim(delim.0, delim.1),
-    <lo:@L> <ident:"ident"> <hi:@R> =>? super::parse_ident(Span::new(lo, hi), ident.0, ident.1),
+    <delim:"delim"> =>? parse_delim(delim),
+    
+    <ident:Ident> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Ident(ident),
+        span: ident.span,
+        attrs: vec![],
+    }),
+    <lo:@L> <lit:"literal"> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Literal(lit),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    })
 }

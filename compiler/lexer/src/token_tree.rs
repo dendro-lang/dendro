@@ -38,11 +38,11 @@ where
                     let inner = self.token_trees_until_close_delim()?;
                     let Some(current) = self.current else {
                         return Err(Diagnostic::error(None, true)
-                            .push_spanned_fmt(
+                            .push_fmt(
                                 open,
                                 format_args!("unclosed delimiter {delim:?}; found unexpected EOF"),
                             )
-                            .report_fatal());
+                            .into_err());
                     };
                     let close = current.span;
                     match current.kind {
@@ -52,12 +52,9 @@ where
                         token::TokenKind::CloseDelim(d) => {
                             self.bump();
                             return Err(Diagnostic::error(None, true)
-                                .push_spanned_fmt(
-                                    open,
-                                    format_args!("unclosed delimiter {delim:?}"),
-                                )
-                                .push_spanned_fmt(close, format_args!("found {d:?}"))
-                                .report_fatal());
+                                .push_fmt(open, format_args!("unclosed delimiter {delim:?}"))
+                                .push_fmt(close, format_args!("found {d:?}"))
+                                .into_err());
                         }
                         _ => unreachable!(),
                     }
