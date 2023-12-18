@@ -1,6 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, BinOp, Expr, Lifetime, Mutability,  RangeLimits, P};
+use super::{Attribute, BinOp, Expr, Lifetime, Mutability, RangeLimits, P};
 use crate::token;
 
 /// `#[attrs] ident = pat`

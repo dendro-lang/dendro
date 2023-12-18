@@ -1,4 +1,4 @@
-use dendro_error::{report, Error};
+use dendro_error::Diagnostic;
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
 
@@ -20,10 +20,10 @@ impl Rule {
     }
 }
 
-pub fn parse(input: &str) -> Result<impl Iterator<Item = Pair<'_, Rule>> + '_, Error> {
+pub fn parse(input: &str) -> Result<impl Iterator<Item = Pair<'_, Rule>> + '_, Diagnostic> {
     match RawTokens::parse(Rule::Tokens, input) {
         Ok(p) => Ok(p.flat_map(|p| p.into_inner().flat_map(|p| p.into_inner()))),
-        Err(e) => Err(report(e).unwrap_err()),
+        Err(e) => Err(e.into()),
     }
 }
 

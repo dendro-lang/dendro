@@ -1,6 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, Lifetime, Mutability, Pat,  Spanned, Stmt, Visibility, P};
+use super::{Attribute, Lifetime, Mutability, Pat, Spanned, Stmt, Visibility, DUMMY_ID, P};
 use crate::token;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -57,8 +57,6 @@ pub enum UnOpKind {
     Not,
     /// `-`
     Neg,
-    /// `exists`
-    Exists,
 }
 
 pub type UnOp = Spanned<UnOpKind>;
@@ -66,9 +64,21 @@ pub type UnOp = Spanned<UnOpKind>;
 /// `forall a where a > 1 ::`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Prerequisites {
+    pub id: u32,
     pub forall: Vec<Ident>,
     pub where_clause: Vec<P<Expr>>,
     pub span: Span,
+}
+
+impl Prerequisites {
+    pub const fn from_span(span: Span) -> Self {
+        Prerequisites {
+            id: DUMMY_ID,
+            forall: Vec::new(),
+            where_clause: Vec::new(),
+            span,
+        }
+    }
 }
 
 /// `pub let x a = a`
@@ -160,7 +170,7 @@ pub enum ExprKind {
     /// `match predicate on { arms.. }`
     Match(P<Expr>, Vec<MatchArm>),
     /// `&'lifetime #mutability expr`
-    Deref(Option<Lifetime>, Mutability, P<Expr>),
+    AddrOf(Option<Lifetime>, Mutability, P<Expr>),
     /// `!a`
     Unary(UnOp, P<Expr>),
     /// `a + b`
@@ -199,8 +209,10 @@ pub enum ExprKind {
     Return(Option<P<Expr>>),
     /// `caller callee`
     Call(P<Expr>, P<Expr>),
-    /// `expr?`.
+    /// `try expr`.
     Try(P<Expr>),
+    /// `exists expr`.
+    Exists(P<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -1,4 +1,10 @@
-use std::{borrow::Cow, fmt, mem, num::NonZeroU16, sync::Mutex};
+use std::{
+    borrow::Cow,
+    fmt, mem,
+    num::NonZeroU16,
+    ops::{Deref, DerefMut},
+    sync::Mutex,
+};
 
 use dendro_span::span::{Pos, Span};
 use internment::Intern;
@@ -55,7 +61,7 @@ impl<R: RuleType> From<pest::error::Error<R>> for Diagnostic {
 }
 
 impl Diagnostic {
-    pub fn new(level: Level) -> Self {
+    pub const fn new(level: Level) -> Self {
         Self {
             level,
             messages: Vec::new(),
@@ -105,38 +111,69 @@ impl Diagnostic {
         });
         self
     }
+}
 
-    pub fn report(&mut self) -> Result<(), Error> {
-        let this = mem::take(self);
-        if this.level.is_fatal() {
-            Err(Error(vec![this]))
-        } else {
-            DIAG.lock().unwrap().push(this);
-            Ok(())
+#[derive(Debug, Default)]
+pub struct DiagCx(Mutex<Vec<Diagnostic>>);
+
+impl DiagCx {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn new_diag(&self, level: Level) -> DiagnosticBuilder {
+        DiagnosticBuilder {
+            cx: Some(self),
+            diag: Diagnostic::new(level),
         }
     }
 
-    pub fn into_err(&mut self) -> Error {
-        Error(vec![mem::take(self)])
+    pub fn push(&self, diag: Diagnostic) {
+        self.0.lock().unwrap().push(diag);
+    }
+
+    pub fn error(&self, code: Option<NonZeroU16>, is_fatal: bool) -> DiagnosticBuilder {
+        self.new_diag(Level::Error { code, is_fatal })
+    }
+
+    pub fn warning(&self) -> DiagnosticBuilder {
+        self.new_diag(Level::Warning)
+    }
+
+    pub fn info(&self) -> DiagnosticBuilder {
+        self.new_diag(Level::Info)
     }
 }
 
-static DIAG: Mutex<Vec<Diagnostic>> = Mutex::new(Vec::new());
-
-pub fn report(e: impl Into<Diagnostic>) -> Result<(), Error> {
-    Diagnostic::report(&mut e.into())
+#[derive(Debug)]
+pub struct DiagnosticBuilder<'a> {
+    cx: Option<&'a DiagCx>,
+    pub diag: Diagnostic,
 }
 
-pub fn take() -> Vec<Diagnostic> {
-    mem::take(&mut DIAG.lock().unwrap())
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct Error(Vec<Diagnostic>);
-
-impl Error {
-    pub fn with_diags(mut self) -> Self {
-        self.0.append(&mut DIAG.lock().unwrap());
-        self
+impl<'a> Deref for DiagnosticBuilder<'a> {
+    type Target = Diagnostic;
+    fn deref(&self) -> &Diagnostic {
+        &self.diag
     }
 }
+
+impl<'a> DerefMut for DiagnosticBuilder<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.diag
+    }
+}
+
+impl<'a> DiagnosticBuilder<'a> {
+    pub fn cancel(mut self) {
+        self.cx = None;
+    }
+
+    pub fn emit(&mut self) {
+        if let Some(cx) = self.cx.take() {
+            cx.0.lock().unwrap().push(mem::take(&mut self.diag))
+        }
+    }
+}
+
+pub type PResult<'a, T> = Result<T, DiagnosticBuilder<'a>>;

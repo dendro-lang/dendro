@@ -168,21 +168,21 @@ impl IntoIterator for TokenStream {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CursorRef<'a> {
-    stream: &'a TokenStream,
-    index: usize,
-}
+pub struct CursorRef<'a>(&'a [(TokenTree, Spacing)]);
 
 impl<'a> CursorRef<'a> {
     fn new(stream: &'a TokenStream) -> Self {
-        CursorRef { stream, index: 0 }
+        CursorRef(&stream.0)
     }
 
     pub fn next_with_spacing(&mut self) -> Option<&'a (TokenTree, Spacing)> {
-        self.stream.0.get(self.index).map(|tree| {
-            self.index += 1;
-            tree
-        })
+        match self {
+            CursorRef([first, next @ ..]) => {
+                *self = CursorRef(next);
+                Some(first)
+            }
+            _ => None,
+        }
     }
 }
 

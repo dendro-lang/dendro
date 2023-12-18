@@ -50,6 +50,7 @@ keywords![
     FOR: "for",
     MATCH: "match",
     LEAF: "leaf",
+    TRY: "try",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -1,13 +1,15 @@
+use std::marker::PhantomData;
+
 use dendro_ast::{ast::*, token, token_stream::*};
 use dendro_span::{span::*, symbol::*, ident::*};
 
 use crate::imp::{Unspanned::*, *};
 
-grammar;
+grammar<'a>(cx: &'a DiagCx);
 
 extern {
     type Location = Pos;
-    type Error = dendro_error::Error;
+    type Error = dendro_error::DiagnosticBuilder<'a>;
 
     enum Unspanned {
         "delim" => Delimited(<token::Delimiter>, <TokenStream>),
@@ -65,6 +67,31 @@ extern {
         "?" => Single(token::Question),
         "'" => Single(token::SingleQuote),
 
+        "_" => Single(token::Ident(kw::UNDERSCORE, false)),
+        "forall" => Single(token::Ident(kw::FORALL, false)),
+        "exists" => Single(token::Ident(kw::EXISTS, false)),
+        "where" => Single(token::Ident(kw::WHERE, false)),
+        "let" => Single(token::Ident(kw::LET, false)),
+        "pub" => Single(token::Ident(kw::PUB, false)),
+        "static" => Single(token::Ident(kw::STATIC, false)),
+        "unsafe" => Single(token::Ident(kw::UNSAFE, false)),
+        "default" => Single(token::Ident(kw::DEFAULT, false)),
+        "const" => Single(token::Ident(kw::CONST, false)),
+        "mut" => Single(token::Ident(kw::MUT, false)),
+        "move" => Single(token::Ident(kw::MOVE, false)),
+        "return" => Single(token::Ident(kw::RETURN, false)),
+        "in" => Single(token::Ident(kw::IN, false)),
+        "if" => Single(token::Ident(kw::IF, false)),
+        "else" => Single(token::Ident(kw::ELSE, false)),
+        "loop" => Single(token::Ident(kw::LOOP, false)),
+        "while" => Single(token::Ident(kw::WHILE, false)),
+        "break" => Single(token::Ident(kw::BREAK, false)),
+        "continue" => Single(token::Ident(kw::CONTINUE, false)),
+        "for" => Single(token::Ident(kw::FOR, false)),
+        "match" => Single(token::Ident(kw::MATCH, false)),
+        "leaf" => Single(token::Ident(kw::LEAF, false)),
+        "try" => Single(token::Ident(kw::TRY, false)),
+
         "literal" => Single(token::Literal(<token::Lit>)),
         "ident" => Single(token::Ident(<Symbol>, <bool>)),
         "lifetime" => Single(token::Lifetime(<Symbol>)),
@@ -75,38 +102,181 @@ extern {
 // ------------------------------------------
 // Identifiers
 
-pub Ident: Ident = {
-    <lo:@L> <ident:"ident"> <hi:@R> =>? ident::parse_ident(Span::new(lo, hi), ident),
+Ident: Ident = {
+    <lo:@L> <ident:"ident"> <hi:@R> =>? ident::parse_ident(cx, Span::new(lo, hi), ident),
 }
 
-pub Lifetime: Lifetime = {
+Lifetime: Lifetime = {
     <lo:@L> <lifetime:"lifetime"> <hi:@R> => Lifetime {
         id: DUMMY_ID,
         ident: Ident::new(lifetime, Span::new(lo, hi)),
-    }
+    },
 }
 
-pub Mutability: Mutability = {
-    "#" <ident:Ident> =>? ident::parse_mutability(ident, true),
-    <ident:Ident> =>? ident::parse_mutability(ident, false),
+Mutability: Mutability = {
+    "const"? => Mutability::kw(kw::CONST),
+    "mut" => Mutability::kw(kw::MUT),
+    "move" => Mutability::kw(kw::MOVE),
+    "#" <ident:Ident> => Mutability { id: DUMMY_ID, ident },
 }
 
 // ------------------------------------------
 // Expressions
 
-pub Expr: P<Expr> = {
-    <delim:"delim"> =>? parse_delim(delim),
-    
+Where: Vec<P<Expr>> = {
+    "where" <first:Expr> <next:("," Expr)*> "," => {
+        [first].into_iter().chain(next.into_iter().map(|n| n.1)).collect()
+    },
+}
+
+Prerequisites: Prerequisites = {
+    <lo:@L>
+        "forall" <first:Ident> <next:("," Ident)*>
+        <w:Where?> "::"
+    <hi:@R> => {
+        Prerequisites {
+            id: DUMMY_ID,
+            forall: [first].into_iter().chain(next.into_iter().map(|n| n.1)).collect(),
+            where_clause: w.unwrap_or_default(),
+            span: Span::new(lo, hi),
+        }
+    }
+}
+
+UnOpKind: UnOpKind = {
+    "*" => UnOpKind::Deref,
+    "!" => UnOpKind::Not,
+    "-" => UnOpKind::Neg,
+}
+
+UnOp: UnOp = {
+    <un:(@L UnOpKind @R)> => UnOp {
+        kind: un.1,
+        span: Span::new(un.0, un.2),
+    }
+}
+
+BinOpKind: BinOpKind = {
+    #[precedence(level = "0")]
+    "." => BinOpKind::Infix,
+    #[precedence(level = "1")]
+    ":" => BinOpKind::BelongsTo,
+    #[precedence(level = "2")]
+    "*" => BinOpKind::Mul,
+    "/" => BinOpKind::Div,
+    "%" => BinOpKind::Rem,
+    #[precedence(level = "3")]
+    "+" => BinOpKind::Add,
+    "-" => BinOpKind::Sub,
+    #[precedence(level = "4")]
+    "<<" => BinOpKind::Shl,
+    ">>" => BinOpKind::Shr,
+    #[precedence(level = "5")]
+    "^" => BinOpKind::BitXor,
+    "&" => BinOpKind::BitAnd,
+    "|" => BinOpKind::BitOr,
+    #[precedence(level = "6")]
+    "==" => BinOpKind::Eq,
+    "!=" => BinOpKind::Ne,
+    "<" => BinOpKind::Lt,
+    ">" => BinOpKind::Gt,
+    "<=" => BinOpKind::Le,
+    ">=" => BinOpKind::Ge,
+    #[precedence(level = "7")]
+    "&&" => BinOpKind::And,
+    #[precedence(level = "8")]
+    "||" => BinOpKind::Or,
+}
+
+BinOp: BinOp = {
+    <un:(@L BinOpKind @R)> => BinOp {
+        kind: un.1,
+        span: Span::new(un.0, un.2),
+    }
+}
+
+ExprAtomic: P<Expr> = {
     <ident:Ident> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Ident(ident),
         span: ident.span,
         attrs: vec![],
     }),
-    <lo:@L> <lit:"literal"> <hi:@R> => P(Expr {
+
+    <lit:(@L "literal" @R)> => P(Expr {
         id: DUMMY_ID,
-        kind: ExprKind::Literal(lit),
+        kind: ExprKind::Literal(lit.1),
+        span: Span::new(lit.0, lit.2),
+        attrs: vec![],
+    }),
+}
+
+Delimited: P<Expr> = {
+    <delim:"delim"> =>? parse_delim(cx, delim),
+}
+
+ExprUnary: P<Expr> = {
+    ExprAtomic,
+
+    <lo:@L> <un:UnOp> <e:ExprAtomic> <hi:@R> => {
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::Unary(un, e),
+            span: Span::new(lo, hi),
+            attrs: vec![],
+        })
+    },
+
+    <lo:@L> "try" <e:ExprUnary> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Try(e),
         span: Span::new(lo, hi),
         attrs: vec![],
-    })
+    }),
+
+    <lo:@L> "exists" <e:ExprUnary> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Exists(e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "&" <l:Lifetime?> <m:Mutability> <e:ExprUnary> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::AddrOf(l, m, e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <func:ExprAtomic> <arg:ExprAtomic> => {
+        let span = Span::new(func.span.start, arg.span.end);
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::Call(func, arg),
+            span,
+            attrs: vec![],
+        })
+    },
+}
+
+ExprBinary: P<Expr> = {
+    ExprUnary,
+
+    <l:ExprUnary> <op:BinOp> <r:ExprBinary> => {
+        let span = Span::new(l.span.start, r.span.end);
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::Binary(l, op, r),
+            span,
+            attrs: vec![],
+        })
+    },
+}
+
+pub Expr: P<Expr> = {
+    ExprBinary
+}
+
+__unused: PhantomData<&'a DiagCx> = {
+    <Ident> => PhantomData,
 }

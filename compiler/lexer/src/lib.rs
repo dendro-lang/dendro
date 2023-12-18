@@ -7,12 +7,18 @@ mod token;
 mod token_tree;
 
 use dendro_ast::token_stream::TokenStream;
-use dendro_error::Error;
+use dendro_error::DiagCx;
 
 use self::token_tree::TokenTrees;
 
-pub fn parse(input: &str) -> Result<TokenStream, Error> {
-    TokenTrees::new(token::parse(input)?).parse()
+pub fn parse(input: &str, cx: &DiagCx) -> TokenStream {
+    match token::parse(input) {
+        Ok(tokens) => TokenTrees::new(tokens, cx).parse(),
+        Err(e) => {
+            cx.push(e);
+            Default::default()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -34,7 +40,7 @@ let main = println /* on console */ "Hello, {} {}!" 0x2a 2.5f64;
 
     #[test]
     fn overall() {
-        let tt = parse(S).unwrap();
+        let tt = parse(S, &DiagCx::new());
         println!("{tt:?}")
     }
 }

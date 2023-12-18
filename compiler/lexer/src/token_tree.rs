@@ -2,7 +2,7 @@ use dendro_ast::{
     token::{self, Token},
     token_stream::{Spacing, TokenStream, TokenTree},
 };
-use dendro_error::{Diagnostic, Error};
+use dendro_error::{DiagCx, PResult};
 use dendro_span::span::DelimSpan;
 use pest::iterators::Pair;
 
@@ -15,20 +15,22 @@ where
 {
     tokens: Tokens<'i, I>,
     current: Option<Token>,
+    diag_cx: &'i DiagCx,
 }
 
 impl<'i, I> TokenTrees<'i, I>
 where
     I: Iterator<Item = Pair<'i, Rule>> + 'i,
 {
-    pub fn new(tokens: Tokens<'i, I>) -> Self {
+    pub fn new(tokens: Tokens<'i, I>, cx: &'i DiagCx) -> Self {
         TokenTrees {
             tokens,
             current: None,
+            diag_cx: cx,
         }
     }
 
-    fn next_token_tree(&mut self) -> Result<(TokenTree, Spacing), Error> {
+    fn next_token_tree(&mut self) -> PResult<'i, (TokenTree, Spacing)> {
         match self.current {
             Some(token) => match token.kind {
                 token::OpenDelim(delim) => {
@@ -37,12 +39,12 @@ where
 
                     let inner = self.token_trees_until_close_delim()?;
                     let Some(current) = self.current else {
-                        return Err(Diagnostic::error(None, true)
-                            .push_fmt(
-                                open,
-                                format_args!("unclosed delimiter {delim:?}; found unexpected EOF"),
-                            )
-                            .into_err());
+                        let mut err = self.diag_cx.error(None, true);
+                        err.push_fmt(
+                            open,
+                            format_args!("unclosed delimiter {delim:?}; found unexpected EOF"),
+                        );
+                        return Err(err);
                     };
                     let close = current.span;
                     match current.kind {
@@ -51,10 +53,10 @@ where
                         }
                         token::TokenKind::CloseDelim(d) => {
                             self.bump();
-                            return Err(Diagnostic::error(None, true)
-                                .push_fmt(open, format_args!("unclosed delimiter {delim:?}"))
-                                .push_fmt(close, format_args!("found {d:?}"))
-                                .into_err());
+                            let mut error = self.diag_cx.error(None, true);
+                            error.push_fmt(open, format_args!("unclosed delimiter {delim:?}"));
+                            error.push_fmt(close, format_args!("found {d:?}"));
+                            return Err(error);
                         }
                         _ => unreachable!(),
                     }
@@ -79,7 +81,7 @@ where
         spacing
     }
 
-    fn token_trees_until_close_delim(&mut self) -> Result<TokenStream, Error> {
+    fn token_trees_until_close_delim(&mut self) -> PResult<'i, TokenStream> {
         let mut vec = TokenStreamBuilder::new();
         loop {
             let is_eof_or_close = matches!(
@@ -96,13 +98,19 @@ where
         }
     }
 
-    pub fn parse(mut self) -> Result<TokenStream, Error> {
+    pub fn parse(mut self) -> TokenStream {
         let mut vec = TokenStreamBuilder::new();
         self.bump();
         while self.current.is_some() {
-            vec.push(self.next_token_tree()?);
+            match self.next_token_tree() {
+                Ok(tt) => vec.push(tt),
+                Err(mut e) => {
+                    e.emit();
+                    return vec.build();
+                }
+            }
         }
-        Ok(vec.build())
+        vec.build()
     }
 }
 

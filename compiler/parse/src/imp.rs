@@ -11,11 +11,11 @@ use dendro_ast::{
     token::{Delimiter, Token, TokenKind},
     token_stream::{Cursor, TokenStream, TokenTree},
 };
-use dendro_error::Error;
+use dendro_error::{DiagCx, DiagnosticBuilder};
 use dendro_span::span::Pos;
 use lalrpop_util::lalrpop_mod;
 
-type ParseError = lalrpop_util::ParseError<Pos, Unspanned, Error>;
+type ParseError<'a> = lalrpop_util::ParseError<Pos, Unspanned, DiagnosticBuilder<'a>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Unspanned {
@@ -23,10 +23,10 @@ pub enum Unspanned {
     Delimited(Delimiter, TokenStream),
 }
 
-struct LalrpopIter(Cursor);
+struct LalrpopIter<'a>(Cursor, &'a DiagCx);
 
-impl Iterator for LalrpopIter {
-    type Item = Result<(Pos, Unspanned, Pos), Error>;
+impl<'a> Iterator for LalrpopIter<'a> {
+    type Item = Result<(Pos, Unspanned, Pos), DiagnosticBuilder<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let tt = self.0.next()?;
@@ -43,7 +43,10 @@ impl Iterator for LalrpopIter {
     }
 }
 
-fn parse_delim((_delim, _tt): (Delimiter, TokenStream)) -> Result<P<Expr>, ParseError> {
+fn parse_delim(
+    _cx: &DiagCx,
+    (_delim, _tt): (Delimiter, TokenStream),
+) -> Result<P<Expr>, ParseError<'_>> {
     todo!()
 }
 
@@ -53,12 +56,12 @@ mod tests {
 
     #[test]
     fn t() {
-        let tt = dendro_lexer::parse("where").unwrap();
+        let cx = DiagCx::new();
+        let tt = dendro_lexer::parse("abcde", &cx);
 
         let p = ExprParser::new();
-        let ts: P<Expr> = p.parse(LalrpopIter(tt.into_trees())).unwrap();
+        let ts: P<Expr> = p.parse(&cx, LalrpopIter(tt.into_trees(), &cx)).unwrap();
 
         println!("{:#?}", ts);
-        println!("{:#?}", dendro_error::take());
     }
 }
