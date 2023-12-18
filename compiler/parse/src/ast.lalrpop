@@ -91,15 +91,6 @@ pub Mutability: Mutability = {
     <ident:Ident> =>? ident::parse_mutability(ident, false),
 }
 
-pub Path: Path = {
-    <lo:@L> <root:"::"?> <hi:@R> <first:Ident> <segments:("::" <Ident>)*> => {
-        root.map(|_| PathSegment::root(Span::new(lo, hi)))
-            .into_iter()
-            .chain([first].into_iter().chain(segments).map(Into::into))
-            .collect()
-    }
-}
-
 // ------------------------------------------
 // Expressions
 

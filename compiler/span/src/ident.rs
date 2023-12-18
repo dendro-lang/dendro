@@ -49,6 +49,7 @@ keywords![
     CONTINUE: "continue",
     FOR: "for",
     MATCH: "match",
+    LEAF: "leaf",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

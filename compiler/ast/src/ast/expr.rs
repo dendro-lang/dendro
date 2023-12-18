@@ -1,6 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, Lifetime, Mutability, Pat, Path, Spanned, Stmt, Visibility, P};
+use super::{Attribute, Lifetime, Mutability, Pat,  Spanned, Stmt, Visibility, P};
 use crate::token;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -145,8 +145,6 @@ pub enum ExprKind {
     Ident(Ident),
     /// `"abcde"`
     Literal(token::Lit),
-    /// `some::module::item`
-    Path(Path),
     /// `forall a where a > 1 :: expr`
     Prereq(Prerequisites, P<Expr>),
     /// `let x a = a`

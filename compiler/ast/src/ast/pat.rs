@@ -1,6 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, BinOp, Expr, Lifetime, Mutability, Path, RangeLimits, P};
+use super::{Attribute, BinOp, Expr, Lifetime, Mutability,  RangeLimits, P};
 use crate::token;
 
 /// `#[attrs] ident = pat`
@@ -35,8 +35,6 @@ pub enum PatKind {
     Struct(Ident, Vec<PatField>),
     /// `A | B`
     Or(Vec<P<Pat>>),
-    /// `some::module::item`
-    Path(Path),
     /// `&'a mut x`
     Ref(Option<Lifetime>, Mutability, P<Pat>),
     /// `123456u32`

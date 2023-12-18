@@ -29,8 +29,8 @@ pub enum VisibilityKind {
     Public,
     /// Inherited
     Inherited,
-    /// `pub(in path)`
-    Restricted { path: P<Path>, id: u32 },
+    /// `pub(in expr)`
+    Restricted { path: P<Expr>, id: u32 },
 }
 
 pub type Visibility = Spanned<VisibilityKind>;
@@ -47,7 +47,7 @@ pub enum AttrArgs {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AttrKind {
-    Normal(Path, AttrArgs),
+    Normal(P<Expr>, AttrArgs),
     /// `///`, `//!`, `/** */` or `/*! */` => `#[doc = ""]`
     Comment(CommentKind, Symbol),
 }
@@ -77,7 +77,7 @@ pub enum UseTreeKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UseTree {
-    pub prefix: Path,
+    pub prefix: P<Expr>,
     pub kind: UseTreeKind,
     pub span: Span,
 }
