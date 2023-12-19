@@ -156,46 +156,8 @@ UnOp: UnOp = {
     }
 }
 
-BinOpKind: BinOpKind = {
-    #[precedence(level = "0")]
-    "." => BinOpKind::Infix,
-    #[precedence(level = "1")]
-    ":" => BinOpKind::BelongsTo,
-    #[precedence(level = "2")]
-    "*" => BinOpKind::Mul,
-    "/" => BinOpKind::Div,
-    "%" => BinOpKind::Rem,
-    #[precedence(level = "3")]
-    "+" => BinOpKind::Add,
-    "-" => BinOpKind::Sub,
-    #[precedence(level = "4")]
-    "<<" => BinOpKind::Shl,
-    ">>" => BinOpKind::Shr,
-    #[precedence(level = "5")]
-    "^" => BinOpKind::BitXor,
-    "&" => BinOpKind::BitAnd,
-    "|" => BinOpKind::BitOr,
-    #[precedence(level = "6")]
-    "==" => BinOpKind::Eq,
-    "!=" => BinOpKind::Ne,
-    "<" => BinOpKind::Lt,
-    ">" => BinOpKind::Gt,
-    "<=" => BinOpKind::Le,
-    ">=" => BinOpKind::Ge,
-    #[precedence(level = "7")]
-    "&&" => BinOpKind::And,
-    #[precedence(level = "8")]
-    "||" => BinOpKind::Or,
-}
-
-BinOp: BinOp = {
-    <un:(@L BinOpKind @R)> => BinOp {
-        kind: un.1,
-        span: Span::new(un.0, un.2),
-    }
-}
-
 ExprAtomic: P<Expr> = {
+    #[precedence(level = "0")]
     <ident:Ident> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Ident(ident),
@@ -209,6 +171,17 @@ ExprAtomic: P<Expr> = {
         span: Span::new(lit.0, lit.2),
         attrs: vec![],
     }),
+
+    #[precedence(level = "1")] #[assoc(side = "left")]
+    <e:ExprAtomic> <op:(@L "." @R)> <func:ExprAtomic> => {
+        let span = Span::new(e.span.start, func.span.end);
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::InfixCall(e, Span::new(op.0, op.2), func),
+            span,
+            attrs: vec![],
+        })
+    }
 }
 
 Delimited: P<Expr> = {
@@ -216,6 +189,7 @@ Delimited: P<Expr> = {
 }
 
 ExprUnary: P<Expr> = {
+    #[precedence(level = "0")]
     ExprAtomic,
 
     <lo:@L> <un:UnOp> <e:ExprAtomic> <hi:@R> => {
@@ -227,20 +201,6 @@ ExprUnary: P<Expr> = {
         })
     },
 
-    <lo:@L> "try" <e:ExprUnary> <hi:@R> => P(Expr {
-        id: DUMMY_ID,
-        kind: ExprKind::Try(e),
-        span: Span::new(lo, hi),
-        attrs: vec![],
-    }),
-
-    <lo:@L> "exists" <e:ExprUnary> <hi:@R> => P(Expr {
-        id: DUMMY_ID,
-        kind: ExprKind::Exists(e),
-        span: Span::new(lo, hi),
-        attrs: vec![],
-    }),
-
     <lo:@L> "&" <l:Lifetime?> <m:Mutability> <e:ExprUnary> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::AddrOf(l, m, e),
@@ -248,7 +208,8 @@ ExprUnary: P<Expr> = {
         attrs: vec![],
     }),
 
-    <func:ExprAtomic> <arg:ExprAtomic> => {
+    #[precedence(level = "1")] #[assoc(side = "left")]
+    <func:ExprUnary> <arg:ExprAtomic> => {
         let span = Span::new(func.span.start, arg.span.end);
         P(Expr {
             id: DUMMY_ID,
@@ -260,21 +221,76 @@ ExprUnary: P<Expr> = {
 }
 
 ExprBinary: P<Expr> = {
+    #[precedence(level = "0")]
     ExprUnary,
 
-    <l:ExprUnary> <op:BinOp> <r:ExprBinary> => {
-        let span = Span::new(l.span.start, r.span.end);
-        P(Expr {
-            id: DUMMY_ID,
-            kind: ExprKind::Binary(l, op, r),
-            span,
-            attrs: vec![],
-        })
-    },
+    #[precedence(level = "1")] #[assoc(side="left")]
+    <lhs:(@L ExprBinary)> <op:(@L "*"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Mul, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L "/"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Div, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L "%"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Rem, op.2), rhs),
+
+    #[precedence(level = "2")] #[assoc(side="left")]
+    <lhs:(@L ExprBinary)> <op:(@L "+"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Add, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L "-"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Sub, op.2), rhs),
+
+    #[precedence(level = "3")] #[assoc(side="left")]
+    <lhs:(@L ExprBinary)> <op:(@L "<<"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Shl, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L ">>"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Shr, op.2), rhs),
+
+    #[precedence(level = "4")] #[assoc(side="left")]
+    <lhs:(@L ExprBinary)> <op:(@L "^"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::BitXor, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L "&"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::BitAnd, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L "|"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::BitOr, op.2), rhs),
+
+    #[precedence(level = "5")] #[assoc(side="left")]
+    <lhs:(@L ExprBinary)> <op:(@L "=="  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Eq, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L "!="  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Ne, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L "<"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Lt, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L ">"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Gt, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L "<="  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Le, op.2), rhs),
+    <lhs:(@L ExprBinary)> <op:(@L ">="  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Ge, op.2), rhs),
+
+    #[precedence(level = "6")] #[assoc(side="left")]
+    <lhs:(@L ExprBinary)> <op:(@L "&&"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::And, op.2), rhs),
+
+    #[precedence(level = "7")] #[assoc(side="left")]
+    <lhs:(@L ExprBinary)> <op:(@L "||"  @R)> <rhs:(ExprBinary @R)> => 
+        expr::parse_bin(lhs, (op.0, BinOpKind::Or, op.2), rhs),
 }
 
 pub Expr: P<Expr> = {
-    ExprBinary
+    ExprBinary,
+
+    <lo:@L> "try" <e:ExprBinary> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Try(e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "exists" <e:ExprBinary> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Exists(e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
 }
 
 __unused: PhantomData<&'a DiagCx> = {

@@ -4,6 +4,7 @@ lalrpop_mod!(
     "/src/ast.rs"
 );
 
+mod expr;
 mod ident;
 
 use dendro_ast::{

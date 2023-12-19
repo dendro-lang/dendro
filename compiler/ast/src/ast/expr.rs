@@ -5,10 +5,6 @@ use crate::token;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BinOpKind {
-    /// `.`
-    Infix,
-    /// `:`
-    BelongsTo,
     /// `*`
     Mul,
     /// `/`
@@ -155,6 +151,8 @@ pub enum ExprKind {
     Ident(Ident),
     /// `"abcde"`
     Literal(token::Lit),
+    /// `expr .call`
+    InfixCall(P<Expr>, Span, P<Expr>),
     /// `forall a where a > 1 :: expr`
     Prereq(Prerequisites, P<Expr>),
     /// `let x a = a`
@@ -213,6 +211,8 @@ pub enum ExprKind {
     Try(P<Expr>),
     /// `exists expr`.
     Exists(P<Expr>),
+    /// `a: b`,
+    BelongsTo(P<Expr>, Span, P<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
