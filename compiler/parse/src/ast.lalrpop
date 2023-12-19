@@ -167,6 +167,11 @@ InnerAttr: () = {
     }),
 }
 
+RangeLimits: RangeLimits = {
+    ".." => RangeLimits::HalfOpen,
+    "..=" => RangeLimits::Closed,
+}
+
 #[inline]
 Attrs: Vec<Attribute> = OuterAttr*;
 
@@ -419,6 +424,14 @@ ExprBinary: P<Expr> = {
         expr::parse_bin(lhs, (op.0, BinOpKind::BitOr, op.2), rhs),
 
     #[precedence(level = "5")] #[assoc(side="left")]
+    <lhs:(@L ExprBinary?)> <r:RangeLimits> <rhs:(ExprBinary? @R)> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Range(lhs.1, r, rhs.0),
+        span: Span::new(lhs.0, rhs.1),
+        attrs: vec![],
+    }),
+
+    #[precedence(level = "6")] #[assoc(side="left")]
     <lhs:(@L ExprBinary)> <op:(@L "=="  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Eq, op.2), rhs),
     <lhs:(@L ExprBinary)> <op:(@L "!="  @R)> <rhs:(ExprBinary @R)> =>
@@ -432,11 +445,11 @@ ExprBinary: P<Expr> = {
     <lhs:(@L ExprBinary)> <op:(@L ">="  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Ge, op.2), rhs),
 
-    #[precedence(level = "6")] #[assoc(side="left")]
+    #[precedence(level = "7")] #[assoc(side="left")]
     <lhs:(@L ExprBinary)> <op:(@L "&&"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::And, op.2), rhs),
 
-    #[precedence(level = "7")] #[assoc(side="left")]
+    #[precedence(level = "8")] #[assoc(side="left")]
     <lhs:(@L ExprBinary)> <op:(@L "||"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Or, op.2), rhs),
 }
@@ -565,20 +578,15 @@ PatStruct: P<Pat> = {
 }
 
 PatAtomic: P<Pat> = {
-    <lo:@L> "(" <pat:Pat> ")" <hi:@R> => pat,
+    <lo:@L> "(" <pat:Pat> ")" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Paren(pat),
+        span: Span::new(lo, hi),
+    }),
 
     <lo:@L> "_" <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Wildcard,
-        span: Span::new(lo, hi)
-    }),
-
-    <lo:@L>
-        <i_lo:@L> <mode:BindingMode> <m:Mutability> <ident:Ident> <i_hi:@R>
-        <alias:("@" PatAtomic)?>
-    <hi:@R> => P(Pat {
-        id: DUMMY_ID,
-        kind: PatKind::Ident(mode, m, ident, alias.map(|p| p.1)),
         span: Span::new(lo, hi)
     }),
 
@@ -591,12 +599,42 @@ PatAtomic: P<Pat> = {
     PatArray,
     PatTuple,
     PatStruct,
+
+}
+
+PatOp: P<Pat> = {
+    #[precedence(level = "0")]
+    PatAtomic,
+
+    #[precedence(level = "1")] #[assoc(side = "left")]
+    <lhs:(@L PatOp?)> <r:RangeLimits> <rhs:(PatOp? @R)> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Range(lhs.1, r, rhs.0),
+        span: Span::new(lhs.0, rhs.1),
+    }),
+
+    #[precedence(level = "2")]
+    <lo:@L> "&" <l:Lifetime?> <m:Mutability> <i:PatOp> <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Deref(l, m, i),
+        span: Span::new(lo, hi),
+    }),
+
+    #[precedence(level = "3")]
+    <lo:@L>
+        <i_lo:@L> <mode:BindingMode> <m:Mutability> <ident:Ident> <i_hi:@R>
+        <alias:("@" PatOp)?>
+    <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Ident(mode, m, ident, alias.map(|p| p.1)),
+        span: Span::new(lo, hi)
+    }),
 }
 
 pub Pat: P<Pat> = {
-    PatAtomic,
+    PatOp,
 
-    <lo:@L> <lhs:(PatAtomic "|")+> <rhs:PatAtomic> <hi:@R> => P(Pat {
+    <lo:@L> <lhs:(PatOp "|")+> <rhs:PatOp> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Or(lhs.into_iter().map(|p| p.0).chain([rhs]).collect()),
         span: Span::new(lo, hi),

@@ -1,6 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, BinOp, Expr, Lifetime, Mutability, RangeLimits, P};
+use super::{Attribute, Lifetime, Mutability, RangeLimits, P};
 use crate::token;
 
 /// `#[attrs] ident = pat`
@@ -36,13 +36,11 @@ pub enum PatKind {
     /// `A | B`
     Or(Vec<P<Pat>>),
     /// `&'a mut x`
-    Ref(Option<Lifetime>, Mutability, P<Pat>),
+    Deref(Option<Lifetime>, Mutability, P<Pat>),
     /// `123456u32`
     Literal(token::Lit),
-    /// `prefix + "target" + suffix`
-    Binary(P<Pat>, BinOp, P<Pat>),
     /// `a..b`
-    Range(Option<P<Expr>>, RangeLimits, Option<P<Expr>>),
+    Range(Option<P<Pat>>, RangeLimits, Option<P<Pat>>),
     /// `(pat)`
     Paren(P<Pat>),
 }
