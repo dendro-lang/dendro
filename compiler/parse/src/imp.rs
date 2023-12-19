@@ -7,6 +7,7 @@ lalrpop_mod!(
 
 mod expr;
 mod ident;
+mod pat;
 
 use std::{cell::RefCell, mem};
 

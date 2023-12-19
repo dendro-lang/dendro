@@ -51,6 +51,7 @@ keywords![
     MATCH: "match",
     LEAF: "leaf",
     TRY: "try",
+    REF: "ref",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

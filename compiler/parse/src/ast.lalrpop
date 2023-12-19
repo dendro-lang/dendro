@@ -101,6 +101,7 @@ extern {
         "match" => token::Ident(kw::MATCH, false),
         "leaf" => token::Ident(kw::LEAF, false),
         "try" => token::Ident(kw::TRY, false),
+        "ref" => token::Ident(kw::REF, false),
 
         "literal" => token::Literal(<token::Lit>),
         "ident" => token::Ident(<Symbol>, <bool>),
@@ -184,6 +185,7 @@ Lifetime: Lifetime = {
     },
 }
 
+#[inline]
 Mutability: Mutability = {
     "const"? => Mutability::kw(kw::CONST),
     "mut" => Mutability::kw(kw::MUT),
@@ -285,6 +287,13 @@ ExprTuple: P<Expr> = {
 }
 
 ExprArray: P<Expr> = {
+    <lo:@L> "[" "]" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Array(vec![]),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
     <lo:@L> "[" <first:Expr> <next:("," Expr)*> ","? "]" <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Array(
@@ -296,6 +305,7 @@ ExprArray: P<Expr> = {
         span: Span::new(lo, hi),
         attrs: vec![],
     }),
+
     <lo:@L> "[" <e:Expr> ";" <count:Expr> "]" <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::ArrayRepeated(e, count),
@@ -342,7 +352,6 @@ ExprDelimited: P<Expr> = {
     ExprPath,
     ExprTuple,
     ExprArray,
-    // "(" <e:Expr> ")" => e,
 }
 
 ExprUnary: P<Expr> = {
@@ -447,6 +456,150 @@ pub Expr: P<Expr> = {
         kind: ExprKind::Exists(e),
         span: Span::new(lo, hi),
         attrs: vec![],
+    }),
+}
+
+// ------------------------------------------
+// Patterns
+
+#[inline]
+BindingMode: BindingMode = {
+    "ref"? => match <> {
+        Some(_) => BindingMode::ByRef,
+        None => BindingMode::ByValue,
+    }
+}
+
+PatTuple: P<Pat> = {
+    <lo:@L> "(" ")" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Tuple(vec![]),
+        span: Span::new(lo, hi),
+    }),
+    <lo:@L> "(" <e:PatAtomic> "," ")" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Tuple(vec![e]),
+        span: Span::new(lo, hi),
+    }),
+    <lo:@L> "(" <first:PatAtomic> <next:("," PatAtomic)+> ","? ")" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Tuple(
+            [first]
+                .into_iter()
+                .chain(next.into_iter().map(|n| n.1))
+                .collect()
+        ),
+        span: Span::new(lo, hi),
+    }),
+}
+
+PatArray: P<Pat> = {
+    <lo:@L> "[" "]" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Array(vec![]),
+        span: Span::new(lo, hi),
+    }),
+
+    <lo:@L> "[" <first:PatAtomic> <next:("," PatAtomic)*> ","? "]" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Array(
+            [first]
+                .into_iter()
+                .chain(next.into_iter().map(|n| n.1))
+                .collect()
+        ),
+        span: Span::new(lo, hi),
+    }),
+}
+
+PatField: PatField = {
+    <lo:@L>
+        <attrs:Attrs>
+        <i:@L> <mode:BindingMode> <m:Mutability> <ident:Ident>
+    <hi:@R> => PatField {
+        attrs: cx.take_attr(attrs),
+        id: DUMMY_ID,
+        ident,
+        pat: pat::parse_ident(Span::new(i, hi), mode, m, ident),
+        span: Span::new(lo, hi),
+        is_shorthand: false,
+        is_placeholder: false,
+    },
+
+    <lo:@L>
+        <attrs:Attrs>
+        <ident:Ident> "=" <pat:PatAtomic>
+    <hi:@R> => PatField {
+        attrs: cx.take_attr(attrs),
+        id: DUMMY_ID,
+        ident,
+        pat,
+        span: Span::new(lo, hi),
+        is_shorthand: true,
+        is_placeholder: false,
+    },
+}
+
+PatStruct: P<Pat> = {
+    <lo:@L> <ident:Ident> "{" "}" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Struct(ident, vec![]),
+        span: Span::new(lo, hi),
+    }),
+
+    <lo:@L> <ident:Ident> "{"
+        <first:PatField>
+        <fields:(";" PatField)*> ";"?
+    "}" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Struct(
+            ident,
+            vec![first]
+                .into_iter()
+                .chain(fields.into_iter().map(|n| n.1))
+                .collect(),
+        ),
+        span: Span::new(lo, hi),
+    }),
+
+}
+
+PatAtomic: P<Pat> = {
+    <lo:@L> "(" <pat:Pat> ")" <hi:@R> => pat,
+
+    <lo:@L> "_" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Wildcard,
+        span: Span::new(lo, hi)
+    }),
+
+    <lo:@L>
+        <i_lo:@L> <mode:BindingMode> <m:Mutability> <ident:Ident> <i_hi:@R>
+        <alias:("@" PatAtomic)?>
+    <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Ident(mode, m, ident, alias.map(|p| p.1)),
+        span: Span::new(lo, hi)
+    }),
+
+    <lo:@L> <lit:"literal"> <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Literal(lit),
+        span: Span::new(lo, hi),
+    }),
+
+    PatArray,
+    PatTuple,
+    PatStruct,
+}
+
+pub Pat: P<Pat> = {
+    PatAtomic,
+
+    <lo:@L> <lhs:(PatAtomic "|")+> <rhs:PatAtomic> <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Or(lhs.into_iter().map(|p| p.0).chain([rhs]).collect()),
+        span: Span::new(lo, hi),
     }),
 }
 

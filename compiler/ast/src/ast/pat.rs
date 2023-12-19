@@ -38,7 +38,7 @@ pub enum PatKind {
     /// `&'a mut x`
     Ref(Option<Lifetime>, Mutability, P<Pat>),
     /// `123456u32`
-    Literal(token::Lit, Span),
+    Literal(token::Lit),
     /// `prefix + "target" + suffix`
     Binary(P<Pat>, BinOp, P<Pat>),
     /// `a..b`
