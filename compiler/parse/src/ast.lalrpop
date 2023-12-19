@@ -1,109 +1,180 @@
 use std::marker::PhantomData;
 
-use dendro_ast::{ast::*, token, token_stream::*};
+use dendro_ast::{ast::*, token::{self, TokenKind}, token_stream::*};
 use dendro_span::{span::*, symbol::*, ident::*};
 
-use crate::imp::{Unspanned::*, *};
+use crate::imp::*;
 
-grammar<'a>(cx: &'a DiagCx);
+grammar<'diag, 'cx>(
+    diag: &'diag DiagCx,
+    cx: &'cx mut ParseCx,
+);
 
 extern {
     type Location = Pos;
-    type Error = dendro_error::DiagnosticBuilder<'a>;
+    type Error = dendro_error::DiagnosticBuilder<'diag>;
 
-    enum Unspanned {
-        "delim" => Delimited(<token::Delimiter>, <TokenStream>),
+    enum TokenKind {
+        "(" => token::OpenDelim(token::Parenthesis),
+        ")" => token::CloseDelim(token::Parenthesis),
+        "[" => token::OpenDelim(token::Bracket),
+        "]" => token::CloseDelim(token::Bracket),
+        "{" => token::OpenDelim(token::Brace),
+        "}" => token::CloseDelim(token::Brace),
+        "open delim" => token::OpenDelim(<token::Delimiter>),
+        "close delim" => token::CloseDelim(<token::Delimiter>),
 
-        "=" => Single(token::Eq),
-        "<" => Single(token::Lt),
-        "<=" => Single(token::Le),
-        "==" => Single(token::EqEq),
-        "!=" => Single(token::Ne),
-        ">=" => Single(token::Ge),
-        ">" => Single(token::Gt),
-        "&&" => Single(token::AndAnd),
-        "||" => Single(token::OrOr),
-        "!" => Single(token::Not),
-        "~" => Single(token::Tilde),
-        "`" => Single(token::BackQuote),
-        "\\" => Single(token::BackSlash),
+        "=" => token::Eq,
+        "<" => token::Lt,
+        "<=" => token::Le,
+        "==" => token::EqEq,
+        "!=" => token::Ne,
+        ">=" => token::Ge,
+        ">" => token::Gt,
+        "&&" => token::AndAnd,
+        "||" => token::OrOr,
+        "!" => token::Not,
+        "~" => token::Tilde,
+        "`" => token::BackQuote,
+        "\\" => token::BackSlash,
 
-        "+" => Single(token::BinOp(token::Plus)),
-        "-" => Single(token::BinOp(token::Minus)),
-        "*" => Single(token::BinOp(token::Star)),
-        "/" => Single(token::BinOp(token::Slash)),
-        "%" => Single(token::BinOp(token::Percent)),
-        "^" => Single(token::BinOp(token::Caret)),
-        "&" => Single(token::BinOp(token::And)),
-        "|" => Single(token::BinOp(token::Or)),
-        "<<" => Single(token::BinOp(token::Shl)),
-        ">>" => Single(token::BinOp(token::Shr)),
+        "+" => token::BinOp(token::Plus),
+        "-" => token::BinOp(token::Minus),
+        "*" => token::BinOp(token::Star),
+        "/" => token::BinOp(token::Slash),
+        "%" => token::BinOp(token::Percent),
+        "^" => token::BinOp(token::Caret),
+        "&" => token::BinOp(token::And),
+        "|" => token::BinOp(token::Or),
+        "<<" => token::BinOp(token::Shl),
+        ">>" => token::BinOp(token::Shr),
 
-        "+=" => Single(token::BinOpEq(token::Plus)),
-        "-=" => Single(token::BinOpEq(token::Minus)),
-        "*=" => Single(token::BinOpEq(token::Star)),
-        "/=" => Single(token::BinOpEq(token::Slash)),
-        "%=" => Single(token::BinOpEq(token::Percent)),
-        "^=" => Single(token::BinOpEq(token::Caret)),
-        "&=" => Single(token::BinOpEq(token::And)),
-        "|=" => Single(token::BinOpEq(token::Or)),
-        "<<=" => Single(token::BinOpEq(token::Shl)),
-        ">>=" => Single(token::BinOpEq(token::Shr)),
+        "+=" => token::BinOpEq(token::Plus),
+        "-=" => token::BinOpEq(token::Minus),
+        "*=" => token::BinOpEq(token::Star),
+        "/=" => token::BinOpEq(token::Slash),
+        "%=" => token::BinOpEq(token::Percent),
+        "^=" => token::BinOpEq(token::Caret),
+        "&=" => token::BinOpEq(token::And),
+        "|=" => token::BinOpEq(token::Or),
+        "<<=" => token::BinOpEq(token::Shl),
+        ">>=" => token::BinOpEq(token::Shr),
 
-        "@" => Single(token::At),
-        "." => Single(token::Dot),
-        ".." => Single(token::DotDot),
-        "..." => Single(token::DotDotDot),
-        "..=" => Single(token::DotDotEq),
-        "," => Single(token::Comma),
-        ";" => Single(token::Semi),
-        ":" => Single(token::Colon),
-        "::" => Single(token::ColonColon),
-        "->" => Single(token::RArrow),
-        "<-" => Single(token::LArrow),
-        "=>" => Single(token::FatArrow),
-        "#" => Single(token::Pound),
-        "$" => Single(token::Dollar),
-        "?" => Single(token::Question),
-        "'" => Single(token::SingleQuote),
+        "@" => token::At,
+        "." => token::Dot,
+        ".." => token::DotDot,
+        "..." => token::DotDotDot,
+        "..=" => token::DotDotEq,
+        "," => token::Comma,
+        ";" => token::Semi,
+        ":" => token::Colon,
+        "::" => token::ColonColon,
+        "->" => token::RArrow,
+        "<-" => token::LArrow,
+        "=>" => token::FatArrow,
+        "#" => token::Pound,
+        "$" => token::Dollar,
+        "?" => token::Question,
+        "'" => token::SingleQuote,
 
-        "_" => Single(token::Ident(kw::UNDERSCORE, false)),
-        "forall" => Single(token::Ident(kw::FORALL, false)),
-        "exists" => Single(token::Ident(kw::EXISTS, false)),
-        "where" => Single(token::Ident(kw::WHERE, false)),
-        "let" => Single(token::Ident(kw::LET, false)),
-        "pub" => Single(token::Ident(kw::PUB, false)),
-        "static" => Single(token::Ident(kw::STATIC, false)),
-        "unsafe" => Single(token::Ident(kw::UNSAFE, false)),
-        "default" => Single(token::Ident(kw::DEFAULT, false)),
-        "const" => Single(token::Ident(kw::CONST, false)),
-        "mut" => Single(token::Ident(kw::MUT, false)),
-        "move" => Single(token::Ident(kw::MOVE, false)),
-        "return" => Single(token::Ident(kw::RETURN, false)),
-        "in" => Single(token::Ident(kw::IN, false)),
-        "if" => Single(token::Ident(kw::IF, false)),
-        "else" => Single(token::Ident(kw::ELSE, false)),
-        "loop" => Single(token::Ident(kw::LOOP, false)),
-        "while" => Single(token::Ident(kw::WHILE, false)),
-        "break" => Single(token::Ident(kw::BREAK, false)),
-        "continue" => Single(token::Ident(kw::CONTINUE, false)),
-        "for" => Single(token::Ident(kw::FOR, false)),
-        "match" => Single(token::Ident(kw::MATCH, false)),
-        "leaf" => Single(token::Ident(kw::LEAF, false)),
-        "try" => Single(token::Ident(kw::TRY, false)),
+        "_" => token::Ident(kw::UNDERSCORE, false),
+        "forall" => token::Ident(kw::FORALL, false),
+        "exists" => token::Ident(kw::EXISTS, false),
+        "where" => token::Ident(kw::WHERE, false),
+        "let" => token::Ident(kw::LET, false),
+        "pub" => token::Ident(kw::PUB, false),
+        "static" => token::Ident(kw::STATIC, false),
+        "unsafe" => token::Ident(kw::UNSAFE, false),
+        "default" => token::Ident(kw::DEFAULT, false),
+        "const" => token::Ident(kw::CONST, false),
+        "mut" => token::Ident(kw::MUT, false),
+        "move" => token::Ident(kw::MOVE, false),
+        "return" => token::Ident(kw::RETURN, false),
+        "in" => token::Ident(kw::IN, false),
+        "if" => token::Ident(kw::IF, false),
+        "else" => token::Ident(kw::ELSE, false),
+        "loop" => token::Ident(kw::LOOP, false),
+        "while" => token::Ident(kw::WHILE, false),
+        "break" => token::Ident(kw::BREAK, false),
+        "continue" => token::Ident(kw::CONTINUE, false),
+        "for" => token::Ident(kw::FOR, false),
+        "match" => token::Ident(kw::MATCH, false),
+        "leaf" => token::Ident(kw::LEAF, false),
+        "try" => token::Ident(kw::TRY, false),
 
-        "literal" => Single(token::Literal(<token::Lit>)),
-        "ident" => Single(token::Ident(<Symbol>, <bool>)),
-        "lifetime" => Single(token::Lifetime(<Symbol>)),
-        "doc" => Single(token::DocComment(<token::CommentKind>, <AttrStyle>, <Symbol>)),
+        "literal" => token::Literal(<token::Lit>),
+        "ident" => token::Ident(<Symbol>, <bool>),
+        "lifetime" => token::Lifetime(<Symbol>),
+        "inner doc" => token::DocComment(<token::CommentKind>, AttrStyle::Inner, <Symbol>),
+        "outer doc" => token::DocComment(<token::CommentKind>, AttrStyle::Outer, <Symbol>),
     }
 }
+
+#[inline]
+Visibility: VisibilityKind = {
+    "pub" "(" "in" <e:ExprPath> ")" => VisibilityKind::Restricted {
+        path: e,
+        id: DUMMY_ID,
+    },
+    "pub" => VisibilityKind::Public,
+}
+
+AttrArgsOpt: AttrArgs = {
+    <eq:(@L "=" @R)> <e:Expr> => AttrArgs::Eq(Span::new(eq.0, eq.2), e),
+    // <delim:(@L "delim" @R)> => AttrArgs::Delimited(
+    //     DelimSpan::from_pair(delim.0.into(), (delim.2 - Pos(1)).into()),
+    //     delim.1 .0,
+    //     delim.1 .1,
+    // ),
+}
+
+AttrArgs: AttrArgs = {
+    AttrArgsOpt? => <>.unwrap_or(AttrArgs::Empty),
+}
+
+OuterAttr: Attribute = {
+    <lo:@L> "#" "[" <e:ExprPath> <args:AttrArgs> "]" <hi:@R> => {
+        Attribute {
+            id: DUMMY_ID,
+            style: AttrStyle::Outer,
+            kind: AttrKind::Normal(e, args),
+            span: Span::new(lo, hi),
+        }
+    },
+    <lo:@L> <doc:"outer doc"> <hi:@R> => Attribute {
+        id: DUMMY_ID,
+        style: AttrStyle::Outer,
+        kind: AttrKind::Comment(doc.0, doc.1),
+        span: Span::new(lo, hi),
+    }
+}
+
+InnerAttr: () = {
+    <lo:@L> "#" "!" "[" <e:ExprPath> <args:AttrArgs> "]" <hi:@R> => {
+        cx.push_attr(Attribute {
+            id: DUMMY_ID,
+            style: AttrStyle::Inner,
+            kind: AttrKind::Normal(e, args),
+            span: Span::new(lo, hi),
+        })
+    },
+    <lo:@L> <doc:"inner doc"> <hi:@R> => cx.push_attr(Attribute {
+        id: DUMMY_ID,
+        style: AttrStyle::Inner,
+        kind: AttrKind::Comment(doc.0, doc.1),
+        span: Span::new(lo, hi),
+    }),
+}
+
+#[inline]
+Attrs: Vec<Attribute> = OuterAttr*;
 
 // ------------------------------------------
 // Identifiers
 
 Ident: Ident = {
-    <lo:@L> <ident:"ident"> <hi:@R> =>? ident::parse_ident(cx, Span::new(lo, hi), ident),
+    <lo:@L> <ident:"ident"> <hi:@R> =>? 
+        ident::parse_ident(diag, Span::new(lo, hi), ident),
 }
 
 Lifetime: Lifetime = {
@@ -124,7 +195,7 @@ Mutability: Mutability = {
 // Expressions
 
 Where: Vec<P<Expr>> = {
-    "where" <first:Expr> <next:("," Expr)*> "," => {
+    "where" <first:Expr> <next:("," Expr)*> ","? => {
         [first].into_iter().chain(next.into_iter().map(|n| n.1)).collect()
     },
 }
@@ -140,7 +211,7 @@ Prerequisites: Prerequisites = {
             where_clause: w.unwrap_or_default(),
             span: Span::new(lo, hi),
         }
-    }
+    },
 }
 
 UnOpKind: UnOpKind = {
@@ -153,11 +224,89 @@ UnOp: UnOp = {
     <un:(@L UnOpKind @R)> => UnOp {
         kind: un.1,
         span: Span::new(un.0, un.2),
-    }
+    },
+}
+
+ExprTupleField: TupleField = {
+    <lo:@L> <prereq:Prerequisites?> <hi:@R> <attrs:Attrs> <e:Expr> => TupleField {
+        prerequisites: prereq.unwrap_or_else(|| {
+            Prerequisites::from_span(Span::new(lo, hi))
+        }),
+        attrs: cx.take_attr(attrs),
+        visibility: Visibility {
+            kind: VisibilityKind::Inherited,
+            span: DUMMY_SPAN
+        },
+        expr: e,
+    },
+    <lo:@L> <prereq:Prerequisites?> <hi:@R>
+        <attrs:Attrs>
+        <vis:(@L Visibility @R)>
+    <e:ExprPath> => TupleField {
+        prerequisites: prereq.unwrap_or_else(|| {
+            Prerequisites::from_span(Span::new(lo, hi))
+        }),
+        attrs: cx.take_attr(attrs),
+        visibility: parse_vis(vis),
+        expr: e,
+    },
+}
+
+ExprTuple: P<Expr> = {
+    <lo:@L> "(" ")" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Tuple(vec![]),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+    <lo:@L> "(" <e:ExprTupleField> "," ")" <hi:@R> => {
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::Tuple(vec![e]),
+            span: Span::new(lo, hi),
+            attrs: vec![],
+        })
+    },
+    <lo:@L> "("
+        <first:ExprTupleField>
+        <next:("," ExprTupleField)+>
+        ","?
+    ")" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Tuple(
+            [first]
+                .into_iter()
+                .chain(next.into_iter().map(|n| n.1))
+                .collect()
+        ),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+}
+
+ExprArray: P<Expr> = {
+    <lo:@L> "[" <first:Expr> <next:("," Expr)*> ","? "]" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Array(
+            [first]
+                .into_iter()
+                .chain(next.into_iter().map(|n| n.1))
+                .collect()
+        ),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+    <lo:@L> "[" <e:Expr> ";" <count:Expr> "]" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::ArrayRepeated(e, count),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
 }
 
 ExprAtomic: P<Expr> = {
-    #[precedence(level = "0")]
+    "(" <e:Expr> ")" => e,
+
     <ident:Ident> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Ident(ident),
@@ -171,6 +320,11 @@ ExprAtomic: P<Expr> = {
         span: Span::new(lit.0, lit.2),
         attrs: vec![],
     }),
+}
+
+ExprPath: P<Expr> = {
+    #[precedence(level = "0")]
+    ExprAtomic,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
     <e:ExprAtomic> <op:(@L "." @R)> <func:ExprAtomic> => {
@@ -181,18 +335,21 @@ ExprAtomic: P<Expr> = {
             span,
             attrs: vec![],
         })
-    }
+    },
 }
 
-Delimited: P<Expr> = {
-    <delim:"delim"> =>? parse_delim(cx, delim),
+ExprDelimited: P<Expr> = {
+    ExprPath,
+    ExprTuple,
+    ExprArray,
+    // "(" <e:Expr> ")" => e,
 }
 
 ExprUnary: P<Expr> = {
     #[precedence(level = "0")]
-    ExprAtomic,
+    ExprDelimited,
 
-    <lo:@L> <un:UnOp> <e:ExprAtomic> <hi:@R> => {
+    <lo:@L> <un:UnOp> <e:ExprDelimited> <hi:@R> => {
         P(Expr {
             id: DUMMY_ID,
             kind: ExprKind::Unary(un, e),
@@ -209,7 +366,7 @@ ExprUnary: P<Expr> = {
     }),
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <func:ExprUnary> <arg:ExprAtomic> => {
+    <func:ExprUnary> <arg:ExprDelimited> => {
         let span = Span::new(func.span.start, arg.span.end);
         P(Expr {
             id: DUMMY_ID,
@@ -225,53 +382,53 @@ ExprBinary: P<Expr> = {
     ExprUnary,
 
     #[precedence(level = "1")] #[assoc(side="left")]
-    <lhs:(@L ExprBinary)> <op:(@L "*"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "*"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Mul, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L "/"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "/"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Div, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L "%"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "%"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Rem, op.2), rhs),
 
     #[precedence(level = "2")] #[assoc(side="left")]
-    <lhs:(@L ExprBinary)> <op:(@L "+"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "+"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Add, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L "-"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "-"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Sub, op.2), rhs),
 
     #[precedence(level = "3")] #[assoc(side="left")]
-    <lhs:(@L ExprBinary)> <op:(@L "<<"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "<<"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Shl, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L ">>"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L ">>"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Shr, op.2), rhs),
 
     #[precedence(level = "4")] #[assoc(side="left")]
-    <lhs:(@L ExprBinary)> <op:(@L "^"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "^"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::BitXor, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L "&"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "&"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::BitAnd, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L "|"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "|"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::BitOr, op.2), rhs),
 
     #[precedence(level = "5")] #[assoc(side="left")]
-    <lhs:(@L ExprBinary)> <op:(@L "=="  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "=="  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Eq, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L "!="  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "!="  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Ne, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L "<"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "<"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Lt, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L ">"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L ">"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Gt, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L "<="  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "<="  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Le, op.2), rhs),
-    <lhs:(@L ExprBinary)> <op:(@L ">="  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L ">="  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Ge, op.2), rhs),
 
     #[precedence(level = "6")] #[assoc(side="left")]
-    <lhs:(@L ExprBinary)> <op:(@L "&&"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "&&"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::And, op.2), rhs),
 
     #[precedence(level = "7")] #[assoc(side="left")]
-    <lhs:(@L ExprBinary)> <op:(@L "||"  @R)> <rhs:(ExprBinary @R)> => 
+    <lhs:(@L ExprBinary)> <op:(@L "||"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Or, op.2), rhs),
 }
 
@@ -293,6 +450,6 @@ pub Expr: P<Expr> = {
     }),
 }
 
-__unused: PhantomData<&'a DiagCx> = {
+__unused: PhantomData<&'diag ()> = {
     <Ident> => PhantomData,
 }

@@ -62,6 +62,7 @@ pub enum AttrStyle {
 pub struct Attribute {
     pub id: u32,
     pub style: AttrStyle,
+    pub kind: AttrKind,
     pub span: Span,
 }
 
