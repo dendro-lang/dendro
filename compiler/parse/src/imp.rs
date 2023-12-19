@@ -8,10 +8,10 @@ lalrpop_mod!(
 mod expr;
 mod ident;
 
-use std::mem;
+use std::{cell::RefCell, mem};
 
 use dendro_ast::{
-    ast::{Visibility, VisibilityKind, Attribute},
+    ast::{Attribute, Visibility, VisibilityKind},
     token::{Delimiter, Token, TokenKind},
     token_stream::{Cursor, TokenStream, TokenTree},
 };
@@ -21,21 +21,6 @@ use lalrpop_util::lalrpop_mod;
 
 type ParseError<'diag> = lalrpop_util::ParseError<Pos, TokenKind, DiagnosticBuilder<'diag>>;
 
-struct ParseCx {
-    inner_attrs: Vec<Attribute>,
-}
-
-impl ParseCx {
-    fn take_attr(&mut self, mut attrs: Vec<Attribute>) -> Vec<Attribute> {
-        attrs.append(&mut self.inner_attrs);
-        attrs
-    }
-
-    fn push_attr(&mut self, attr: Attribute) {
-        self.inner_attrs.push(attr);
-    }
-}
-
 #[derive(Debug)]
 struct Frame {
     cursor: Cursor,
@@ -44,24 +29,20 @@ struct Frame {
 }
 
 #[derive(Debug)]
-struct LalrpopIter {
+struct TokenFrames {
     current: Cursor,
     stack: Vec<Frame>,
 }
 
-impl LalrpopIter {
-    fn new(tts: TokenStream) -> Self {
-        LalrpopIter {
-            current: tts.into_trees(),
+impl TokenFrames {
+    fn new(tokens: TokenStream) -> Self {
+        TokenFrames {
+            current: tokens.into_trees(),
             stack: Vec::new(),
         }
     }
-}
 
-impl Iterator for LalrpopIter {
-    type Item = (Pos, TokenKind, Pos);
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next_token(&mut self) -> Option<(Pos, TokenKind, Pos)> {
         Some(match self.current.next() {
             Some(TokenTree::Token(Token { kind, span })) => (span.start, kind, span.end),
             Some(TokenTree::Delimited(span, delim, tts)) => {
@@ -82,6 +63,45 @@ impl Iterator for LalrpopIter {
             },
         })
     }
+
+    fn comsume_delim(&mut self, delim: Delimiter) -> (TokenStream, Span) {
+        let frame = self.stack.pop().unwrap();
+        assert_eq!(frame.delim, delim);
+        let cursor = mem::replace(&mut self.current, frame.cursor);
+        (cursor.into_stream(), frame.close_span)
+    }
+}
+
+#[derive(Debug)]
+struct ParseCx<'a> {
+    inner_attrs: Vec<Attribute>,
+    token_frames: &'a RefCell<TokenFrames>,
+}
+
+impl<'a> ParseCx<'a> {
+    fn take_attr(&mut self, mut attrs: Vec<Attribute>) -> Vec<Attribute> {
+        attrs.append(&mut self.inner_attrs);
+        attrs
+    }
+
+    fn push_attr(&mut self, attr: Attribute) {
+        self.inner_attrs.push(attr);
+    }
+
+    fn consume_delim(&mut self, delim: Delimiter) -> (TokenStream, Span) {
+        self.token_frames.borrow_mut().comsume_delim(delim)
+    }
+}
+
+#[derive(Debug)]
+struct LalrpopIter<'a>(&'a RefCell<TokenFrames>);
+
+impl<'a> Iterator for LalrpopIter<'a> {
+    type Item = (Pos, TokenKind, Pos);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.borrow_mut().next_token()
+    }
 }
 
 fn parse_vis(input: (Pos, VisibilityKind, Pos)) -> Visibility {
@@ -100,15 +120,15 @@ mod tests {
     #[test]
     fn t() {
         let diag = DiagCx::new();
-        let mut cx = ParseCx {
-            inner_attrs: Vec::new(),
-        };
         let tts = dendro_lexer::parse("abcde", &diag);
 
+        let tf = RefCell::new(TokenFrames::new(tts));
+        let mut cx = ParseCx {
+            inner_attrs: Vec::new(),
+            token_frames: &tf,
+        };
         let p = ExprParser::new();
-        let ts: P<Expr> = p
-            .parse(&diag, &mut cx, LalrpopIter::new(tts))
-            .unwrap();
+        let ts: P<Expr> = p.parse(&diag, &mut cx, LalrpopIter(&tf)).unwrap();
 
         println!("{:#?}", ts);
     }

@@ -5,9 +5,9 @@ use dendro_span::{span::*, symbol::*, ident::*};
 
 use crate::imp::*;
 
-grammar<'diag, 'cx>(
+grammar<'diag, 'a, 'cx>(
     diag: &'diag DiagCx,
-    cx: &'cx mut ParseCx,
+    cx: &'a mut ParseCx<'cx>,
 );
 
 extern {
@@ -121,11 +121,11 @@ Visibility: VisibilityKind = {
 
 AttrArgsOpt: AttrArgs = {
     <eq:(@L "=" @R)> <e:Expr> => AttrArgs::Eq(Span::new(eq.0, eq.2), e),
-    // <delim:(@L "delim" @R)> => AttrArgs::Delimited(
-    //     DelimSpan::from_pair(delim.0.into(), (delim.2 - Pos(1)).into()),
-    //     delim.1 .0,
-    //     delim.1 .1,
-    // ),
+    <lo:@L> <delim:"open delim"> <hi:@R> => {
+        let open = Span::new(lo, hi);
+        let (tts, close) = cx.consume_delim(delim);
+        AttrArgs::Delimited(DelimSpan::from_pair(open, close), delim, tts)
+    }
 }
 
 AttrArgs: AttrArgs = {

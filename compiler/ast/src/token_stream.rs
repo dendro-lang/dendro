@@ -219,6 +219,11 @@ impl Cursor {
     pub fn look_ahead(&self, n: usize) -> Option<&TokenTree> {
         self.stream.0[self.index..].get(n).map(|(tree, _)| tree)
     }
+
+    pub fn into_stream(self) -> TokenStream {
+        assert_eq!(self.index, 0);
+        self.stream
+    }
 }
 
 impl Iterator for Cursor {
