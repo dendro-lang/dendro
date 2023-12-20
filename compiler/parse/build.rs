@@ -1,6 +1,4 @@
 fn main() {
-    lalrpop::Configuration::new()
-        .emit_rerun_directives(true)
-        .process()
-        .unwrap();
+    println!("cargo:rerun-if-changed=src/ast.lalrpop");
+    lalrpop::Configuration::new().process().unwrap();
 }

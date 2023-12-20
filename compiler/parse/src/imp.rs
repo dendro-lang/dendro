@@ -138,7 +138,7 @@ pub fn parse(diag: &DiagCx, input: TokenStream) -> Result<Leaf, ParseError> {
         inner_attrs: Vec::new(),
         token_frames: &tf,
     };
-    let stmts: Vec<P<Stmt>> = ast::StmtsParser::new().parse(&diag, &mut cx, LalrpopIter(&tf))?;
+    let stmts: Vec<P<Stmt>> = ast::StmtsParser::new().parse(diag, &mut cx, LalrpopIter(&tf))?;
     Ok(Leaf {
         id: DUMMY_ID,
         attrs: cx.inner_attrs,
