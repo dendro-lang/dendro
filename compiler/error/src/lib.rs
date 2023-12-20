@@ -132,6 +132,10 @@ impl DiagCx {
         self.0.lock().unwrap().push(diag);
     }
 
+    pub fn take(&self) -> Vec<Diagnostic> {
+        mem::take(&mut self.0.lock().unwrap())
+    }
+
     pub fn error(&self, code: Option<NonZeroU16>, is_fatal: bool) -> DiagnosticBuilder {
         self.new_diag(Level::Error { code, is_fatal })
     }

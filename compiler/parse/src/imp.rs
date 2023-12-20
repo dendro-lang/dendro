@@ -115,9 +115,9 @@ impl<'a> ParseCx<'a> {
 }
 
 #[derive(Debug)]
-struct LalrpopIter<'a>(&'a RefCell<TokenFrames>);
+struct Iter<'a>(&'a RefCell<TokenFrames>);
 
-impl<'a> Iterator for LalrpopIter<'a> {
+impl<'a> Iterator for Iter<'a> {
     type Item = (Pos, SpacedToken, Pos);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -138,7 +138,7 @@ pub fn parse(diag: &DiagCx, input: TokenStream) -> Result<Leaf, ParseError> {
         inner_attrs: Vec::new(),
         token_frames: &tf,
     };
-    let stmts: Vec<P<Stmt>> = ast::StmtsParser::new().parse(diag, &mut cx, LalrpopIter(&tf))?;
+    let stmts: Vec<P<Stmt>> = ast::StmtsParser::new().parse(diag, &mut cx, Iter(&tf))?;
     Ok(Leaf {
         id: DUMMY_ID,
         attrs: cx.inner_attrs,

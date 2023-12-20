@@ -96,3 +96,17 @@ pub struct Leaf {
     pub stmts: Vec<P<Stmt>>,
     pub span: Span,
 }
+
+impl Leaf {
+    pub fn load_block(self, mut block: Block) -> (Block, Vec<Attribute>) {
+        assert_eq!(block.kind, BlockKind::Unloaded);
+
+        block.kind = BlockKind::Loaded {
+            stmts: self.stmts,
+            is_inline: true,
+            span: self.span,
+        };
+        block.id = self.id;
+        (block, self.attrs)
+    }
+}
