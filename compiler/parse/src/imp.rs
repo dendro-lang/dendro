@@ -12,25 +12,29 @@ mod pat;
 use std::{cell::RefCell, mem};
 
 use dendro_ast::{
-    ast::{Attribute, Visibility, VisibilityKind},
+    ast::{Attribute, Leaf, Stmt, Visibility, VisibilityKind, DUMMY_ID, P},
     token::{Delimiter, Token, TokenKind},
-    token_stream::{Cursor, TokenStream, TokenTree},
+    token_stream::{Cursor, Spacing, TokenStream, TokenTree},
 };
 use dendro_error::{DiagCx, DiagnosticBuilder};
 use dendro_span::span::{Pos, Span};
 use lalrpop_util::lalrpop_mod;
 
-type ParseError<'diag> = lalrpop_util::ParseError<Pos, TokenKind, DiagnosticBuilder<'diag>>;
+type SpacedToken = (Spacing, TokenKind, Spacing);
+
+type ParseError<'diag> = lalrpop_util::ParseError<Pos, SpacedToken, DiagnosticBuilder<'diag>>;
 
 #[derive(Debug)]
 struct Frame {
     cursor: Cursor,
     delim: Delimiter,
     close_span: Span,
+    close_spacing: Spacing,
 }
 
 #[derive(Debug)]
 struct TokenFrames {
+    last_spacing: Spacing,
     current: Cursor,
     stack: Vec<Frame>,
 }
@@ -38,27 +42,43 @@ struct TokenFrames {
 impl TokenFrames {
     fn new(tokens: TokenStream) -> Self {
         TokenFrames {
+            last_spacing: Spacing::Alone,
             current: tokens.into_trees(),
             stack: Vec::new(),
         }
     }
 
-    fn next_token(&mut self) -> Option<(Pos, TokenKind, Pos)> {
-        Some(match self.current.next() {
-            Some(TokenTree::Token(Token { kind, span })) => (span.start, kind, span.end),
-            Some(TokenTree::Delimited(span, delim, tts)) => {
+    fn next_token(&mut self) -> Option<(Pos, SpacedToken, Pos)> {
+        Some(match self.current.next_with_spacing() {
+            Some((TokenTree::Token(Token { kind, span }), end)) => {
+                let start = mem::replace(&mut self.last_spacing, end);
+                (span.start, (start, kind, end), span.end)
+            }
+            Some((TokenTree::Delimited(span, delim, tts), s)) => {
+                let start = mem::replace(&mut self.last_spacing, s);
                 self.stack.push(Frame {
                     cursor: mem::replace(&mut self.current, tts.into_trees()),
                     delim,
                     close_span: span.close,
+                    close_spacing: s,
                 });
-                (span.open.start, TokenKind::OpenDelim(delim), span.open.end)
+                (
+                    span.open.start,
+                    (start, TokenKind::OpenDelim(delim), Spacing::Alone),
+                    span.open.end,
+                )
             }
             None => match self.stack.pop() {
                 Some(frame) => {
                     let close = frame.close_span;
+                    let end = frame.close_spacing;
+                    let start = mem::replace(&mut self.last_spacing, end);
                     self.current = frame.cursor;
-                    (close.start, TokenKind::CloseDelim(frame.delim), close.end)
+                    (
+                        close.start,
+                        (start, TokenKind::CloseDelim(frame.delim), end),
+                        close.end,
+                    )
                 }
                 None => return None,
             },
@@ -98,7 +118,7 @@ impl<'a> ParseCx<'a> {
 struct LalrpopIter<'a>(&'a RefCell<TokenFrames>);
 
 impl<'a> Iterator for LalrpopIter<'a> {
-    type Item = (Pos, TokenKind, Pos);
+    type Item = (Pos, SpacedToken, Pos);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.borrow_mut().next_token()
@@ -112,24 +132,31 @@ fn parse_vis(input: (Pos, VisibilityKind, Pos)) -> Visibility {
     }
 }
 
+pub fn parse(diag: &DiagCx, input: TokenStream) -> Result<Leaf, ParseError> {
+    let tf = RefCell::new(TokenFrames::new(input));
+    let mut cx = ParseCx {
+        inner_attrs: Vec::new(),
+        token_frames: &tf,
+    };
+    let stmts: Vec<P<Stmt>> = ast::StmtsParser::new().parse(&diag, &mut cx, LalrpopIter(&tf))?;
+    Ok(Leaf {
+        id: DUMMY_ID,
+        attrs: cx.inner_attrs,
+        stmts,
+        span: Span::new(Pos(0), Pos(1)),
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use dendro_ast::ast::{Expr, P};
-
-    use super::{ast::ExprParser, *};
+    use super::*;
 
     #[test]
     fn t() {
         let diag = DiagCx::new();
         let tts = dendro_lexer::parse("abcde", &diag);
 
-        let tf = RefCell::new(TokenFrames::new(tts));
-        let mut cx = ParseCx {
-            inner_attrs: Vec::new(),
-            token_frames: &tf,
-        };
-        let p = ExprParser::new();
-        let ts: P<Expr> = p.parse(&diag, &mut cx, LalrpopIter(&tf)).unwrap();
+        let ts = parse(&diag, tts).unwrap();
 
         println!("{:#?}", ts);
     }

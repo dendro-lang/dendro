@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use dendro_ast::{ast::*, token::{self, TokenKind}, token_stream::*};
+use dendro_ast::{ast::*, token, token_stream::*};
 use dendro_span::{span::*, symbol::*, ident::*};
 
 use crate::imp::*;
@@ -14,102 +14,128 @@ extern {
     type Location = Pos;
     type Error = dendro_error::DiagnosticBuilder<'diag>;
 
-    enum TokenKind {
-        "(" => token::OpenDelim(token::Parenthesis),
-        ")" => token::CloseDelim(token::Parenthesis),
-        "[" => token::OpenDelim(token::Bracket),
-        "]" => token::CloseDelim(token::Bracket),
-        "{" => token::OpenDelim(token::Brace),
-        "}" => token::CloseDelim(token::Brace),
-        "open delim" => token::OpenDelim(<token::Delimiter>),
-        "close delim" => token::CloseDelim(<token::Delimiter>),
+    enum SpacedToken {
+        "(" => (_, token::OpenDelim(token::Parenthesis), _),
+        ")" => (_, token::CloseDelim(token::Parenthesis), _),
+        "`[" => (Spacing::Joint, token::OpenDelim(token::Bracket), _),
+        "[" => (_, token::OpenDelim(token::Bracket), _),
+        "]" => (_, token::CloseDelim(token::Bracket), _),
+        "{" => (_, token::OpenDelim(token::Brace), _),
+        "}" => (_, token::CloseDelim(token::Brace), _),
+        "open delim" => (_, token::OpenDelim(<token::Delimiter>), _),
+        "close delim" => (_, token::CloseDelim(<token::Delimiter>), _),
 
-        "=" => token::Eq,
-        "<" => token::Lt,
-        "<=" => token::Le,
-        "==" => token::EqEq,
-        "!=" => token::Ne,
-        ">=" => token::Ge,
-        ">" => token::Gt,
-        "&&" => token::AndAnd,
-        "||" => token::OrOr,
-        "!" => token::Not,
-        "~" => token::Tilde,
-        "`" => token::BackQuote,
-        "\\" => token::BackSlash,
+        "=" => (_, token::Eq, _),
+        "<" => (_, token::Lt, _),
+        "<=" => (_, token::Le, _),
+        "==" => (_, token::EqEq, _),
+        "!=" => (_, token::Ne, _),
+        ">=" => (_, token::Ge, _),
+        ">" => (_, token::Gt, _),
+        "&&" => (_, token::AndAnd, _),
+        "||" => (_, token::OrOr, _),
+        "!" => (_, token::Not, _),
+        "~" => (_, token::Tilde, _),
+        "`" => (_, token::BackQuote, _),
+        "\\`" => (_, token::BackSlash, Spacing::Joint),
+        "\\" => (_, token::BackSlash, _),
 
-        "+" => token::BinOp(token::Plus),
-        "-" => token::BinOp(token::Minus),
-        "*" => token::BinOp(token::Star),
-        "/" => token::BinOp(token::Slash),
-        "%" => token::BinOp(token::Percent),
-        "^" => token::BinOp(token::Caret),
-        "&" => token::BinOp(token::And),
-        "|" => token::BinOp(token::Or),
-        "<<" => token::BinOp(token::Shl),
-        ">>" => token::BinOp(token::Shr),
+        "-`" => (_, token::BinOp(token::Minus), Spacing::Joint),
+        "*`" => (_, token::BinOp(token::Star), Spacing::Joint),
+        "&`" => (_, token::BinOp(token::And), Spacing::Joint),
 
-        "+=" => token::BinOpEq(token::Plus),
-        "-=" => token::BinOpEq(token::Minus),
-        "*=" => token::BinOpEq(token::Star),
-        "/=" => token::BinOpEq(token::Slash),
-        "%=" => token::BinOpEq(token::Percent),
-        "^=" => token::BinOpEq(token::Caret),
-        "&=" => token::BinOpEq(token::And),
-        "|=" => token::BinOpEq(token::Or),
-        "<<=" => token::BinOpEq(token::Shl),
-        ">>=" => token::BinOpEq(token::Shr),
+        "+" => (_, token::BinOp(token::Plus), _),
+        "-" => (_, token::BinOp(token::Minus), _),
+        "*" => (_, token::BinOp(token::Star), _),
+        "/" => (_, token::BinOp(token::Slash), _),
+        "%" => (_, token::BinOp(token::Percent), _),
+        "^" => (_, token::BinOp(token::Caret), _),
+        "&" => (_, token::BinOp(token::And), _),
+        "|" => (_, token::BinOp(token::Or), _),
+        "<<" => (_, token::BinOp(token::Shl), _),
+        ">>" => (_, token::BinOp(token::Shr), _),
 
-        "@" => token::At,
-        "." => token::Dot,
-        ".." => token::DotDot,
-        "..." => token::DotDotDot,
-        "..=" => token::DotDotEq,
-        "," => token::Comma,
-        ";" => token::Semi,
-        ":" => token::Colon,
-        "::" => token::ColonColon,
-        "->" => token::RArrow,
-        "<-" => token::LArrow,
-        "=>" => token::FatArrow,
-        "#" => token::Pound,
-        "$" => token::Dollar,
-        "?" => token::Question,
-        "'" => token::SingleQuote,
+        "+=" => (_, token::BinOpEq(token::Plus), _),
+        "-=" => (_, token::BinOpEq(token::Minus), _),
+        "*=" => (_, token::BinOpEq(token::Star), _),
+        "/=" => (_, token::BinOpEq(token::Slash), _),
+        "%=" => (_, token::BinOpEq(token::Percent), _),
+        "^=" => (_, token::BinOpEq(token::Caret), _),
+        "&=" => (_, token::BinOpEq(token::And), _),
+        "|=" => (_, token::BinOpEq(token::Or), _),
+        "<<=" => (_, token::BinOpEq(token::Shl), _),
+        ">>=" => (_, token::BinOpEq(token::Shr), _),
 
-        "_" => token::Ident(kw::UNDERSCORE, false),
-        "forall" => token::Ident(kw::FORALL, false),
-        "exists" => token::Ident(kw::EXISTS, false),
-        "where" => token::Ident(kw::WHERE, false),
-        "let" => token::Ident(kw::LET, false),
-        "pub" => token::Ident(kw::PUB, false),
-        "static" => token::Ident(kw::STATIC, false),
-        "unsafe" => token::Ident(kw::UNSAFE, false),
-        "default" => token::Ident(kw::DEFAULT, false),
-        "const" => token::Ident(kw::CONST, false),
-        "mut" => token::Ident(kw::MUT, false),
-        "move" => token::Ident(kw::MOVE, false),
-        "return" => token::Ident(kw::RETURN, false),
-        "in" => token::Ident(kw::IN, false),
-        "if" => token::Ident(kw::IF, false),
-        "else" => token::Ident(kw::ELSE, false),
-        "loop" => token::Ident(kw::LOOP, false),
-        "while" => token::Ident(kw::WHILE, false),
-        "break" => token::Ident(kw::BREAK, false),
-        "continue" => token::Ident(kw::CONTINUE, false),
-        "for" => token::Ident(kw::FOR, false),
-        "match" => token::Ident(kw::MATCH, false),
-        "leaf" => token::Ident(kw::LEAF, false),
-        "try" => token::Ident(kw::TRY, false),
-        "ref" => token::Ident(kw::REF, false),
+        "@" => (_, token::At, _),
+        "." => (_, token::Dot, _),
+        ".." => (_, token::DotDot, _),
+        "`.." => (Spacing::Joint, token::DotDot, _),
+        "..`" => (_, token::DotDot, Spacing::Joint),
+        "`..`" => (Spacing::Joint, token::DotDot, Spacing::Joint),
+        "..." => (_, token::DotDotDot, _),
+        "..=" => (_, token::DotDotEq, _),
+        "`..=" => (Spacing::Joint, token::DotDotEq, _),
+        "..=`" => (_, token::DotDotEq, Spacing::Joint),
+        "`..=`" => (Spacing::Joint, token::DotDotEq, Spacing::Joint),
+        "," => (_, token::Comma, _),
+        ";" => (_, token::Semi, _),
+        ":" => (_, token::Colon, _),
+        "::" => (_, token::ColonColon, _),
+        "->" => (_, token::RArrow, _),
+        "<-" => (_, token::LArrow, _),
+        "=>" => (_, token::FatArrow, _),
+        "#" => (_, token::Pound, _),
+        "$" => (_, token::Dollar, _),
+        "?" => (_, token::Question, _),
+        "'" => (_, token::SingleQuote, _),
 
-        "literal" => token::Literal(<token::Lit>),
-        "ident" => token::Ident(<Symbol>, <bool>),
-        "lifetime" => token::Lifetime(<Symbol>),
-        "inner doc" => token::DocComment(<token::CommentKind>, AttrStyle::Inner, <Symbol>),
-        "outer doc" => token::DocComment(<token::CommentKind>, AttrStyle::Outer, <Symbol>),
+        "_" => (_, token::Ident(kw::UNDERSCORE, false), _),
+        "forall" => (_, token::Ident(kw::FORALL, false), _),
+        "exists" => (_, token::Ident(kw::EXISTS, false), _),
+        "where" => (_, token::Ident(kw::WHERE, false), _),
+        "let" => (_, token::Ident(kw::LET, false), _),
+        "pub" => (_, token::Ident(kw::PUB, false), _),
+        "static" => (_, token::Ident(kw::STATIC, false), _),
+        "unsafe" => (_, token::Ident(kw::UNSAFE, false), _),
+        "default" => (_, token::Ident(kw::DEFAULT, false), _),
+        "const" => (_, token::Ident(kw::CONST, false), _),
+        "mut" => (_, token::Ident(kw::MUT, false), _),
+        "move" => (_, token::Ident(kw::MOVE, false), _),
+        "return" => (_, token::Ident(kw::RETURN, false), _),
+        "in" => (_, token::Ident(kw::IN, false), _),
+        "if" => (_, token::Ident(kw::IF, false), _),
+        "else" => (_, token::Ident(kw::ELSE, false), _),
+        "loop" => (_, token::Ident(kw::LOOP, false), _),
+        "while" => (_, token::Ident(kw::WHILE, false), _),
+        "break" => (_, token::Ident(kw::BREAK, false), _),
+        "continue" => (_, token::Ident(kw::CONTINUE, false), _),
+        "for" => (_, token::Ident(kw::FOR, false), _),
+        "match" => (_, token::Ident(kw::MATCH, false), _),
+        "leaf" => (_, token::Ident(kw::LEAF, false), _),
+        "try" => (_, token::Ident(kw::TRY, false), _),
+        "ref" => (_, token::Ident(kw::REF, false), _),
+        "then" => (_, token::Ident(kw::THEN, false), _),
+        "do" => (_, token::Ident(kw::DO, false), _),
+        "with" => (_, token::Ident(kw::WITH, false), _),
+
+        "literal" => (_, token::Literal(<token::Lit>), _),
+        "ident" => (_, token::Ident(<Symbol>, <bool>), _),
+        "lifetime" => (_, token::Lifetime(<Symbol>), _),
+        "inner doc" => (
+            _,
+            token::DocComment(<token::CommentKind>, AttrStyle::Inner, <Symbol>),
+            _,
+        ),
+        "outer doc" => (
+            _,
+            token::DocComment(<token::CommentKind>, AttrStyle::Outer, <Symbol>),
+            _,
+        ),
     }
 }
+
+// ------------------------------------------
+// Units
 
 #[inline]
 Visibility: VisibilityKind = {
@@ -173,7 +199,67 @@ RangeLimits: RangeLimits = {
 }
 
 #[inline]
+Range<T>: (Option<T>, RangeLimits, Option<T>, Span) = {
+}
+
+#[inline]
+RangeTo<T>: (RangeLimits, T, Span) = {
+    <lo:@L> "..`" <rhs:T> <hi:@R> => {
+        (RangeLimits::HalfOpen, rhs, Span::new(lo, hi))
+    },
+    <lo:@L> "..=`" <rhs:T> <hi:@R> => {
+        (RangeLimits::Closed, rhs, Span::new(lo, hi))
+    },
+}
+
+#[inline]
 Attrs: Vec<Attribute> = OuterAttr*;
+
+#[inline]
+AssignOp: BinOp = {
+    <lo:@L> "+=" <hi:@R> => BinOp::new(BinOpKind::Add, Span::new(lo, hi)),
+    <lo:@L> "-=" <hi:@R> => BinOp::new(BinOpKind::Sub, Span::new(lo, hi)),
+    <lo:@L> "*=" <hi:@R> => BinOp::new(BinOpKind::Mul, Span::new(lo, hi)),
+    <lo:@L> "/=" <hi:@R> => BinOp::new(BinOpKind::Div, Span::new(lo, hi)),
+    <lo:@L> "%=" <hi:@R> => BinOp::new(BinOpKind::Rem, Span::new(lo, hi)),
+    <lo:@L> "^=" <hi:@R> => BinOp::new(BinOpKind::BitXor, Span::new(lo, hi)),
+    <lo:@L> "&=" <hi:@R> => BinOp::new(BinOpKind::BitAnd, Span::new(lo, hi)),
+    <lo:@L> "|=" <hi:@R> => BinOp::new(BinOpKind::BitOr, Span::new(lo, hi)),
+    <lo:@L> "<<=" <hi:@R> => BinOp::new(BinOpKind::Shl, Span::new(lo, hi)),
+    <lo:@L> ">>=" <hi:@R> => BinOp::new(BinOpKind::Shr, Span::new(lo, hi)),
+}
+
+#[inline]
+Operator: Operator = {
+    AssignOp => Operator::AssignBinary(<>),
+
+    <lo:@L> "=" <hi:@R> => Operator::from_assign(Span::new(lo, hi)),
+    <lo:@L> "<" <hi:@R> => Operator::from_bin(BinOpKind::Lt, Span::new(lo, hi)),
+    <lo:@L> "<=" <hi:@R> => Operator::from_bin(BinOpKind::Le, Span::new(lo, hi)),
+    <lo:@L> "==" <hi:@R> => Operator::from_bin(BinOpKind::Eq, Span::new(lo, hi)),
+    <lo:@L> "!=" <hi:@R> => Operator::from_bin(BinOpKind::Ne, Span::new(lo, hi)),
+    <lo:@L> ">=" <hi:@R> => Operator::from_bin(BinOpKind::Ge, Span::new(lo, hi)),
+    <lo:@L> ">" <hi:@R> => Operator::from_bin(BinOpKind::Gt, Span::new(lo, hi)),
+    <lo:@L> "&&" <hi:@R> => Operator::from_bin(BinOpKind::And, Span::new(lo, hi)),
+    <lo:@L> "||" <hi:@R> => Operator::from_bin(BinOpKind::Or, Span::new(lo, hi)),
+
+    <lo:@L> "!" <hi:@R> => Operator::from_un(UnOpKind::Not, Span::new(lo, hi)),
+    <lo:@L> "`" "-" <hi:@R> => Operator::from_un(UnOpKind::Neg, Span::new(lo, hi)),
+    <lo:@L> "`" "*" <hi:@R> => Operator::from_un(UnOpKind::Deref, Span::new(lo, hi)),
+
+    <lo:@L> "+" <hi:@R> => Operator::from_bin(BinOpKind::Add, Span::new(lo, hi)),
+    <lo:@L> "-" <hi:@R> => Operator::from_bin(BinOpKind::Sub, Span::new(lo, hi)),
+    <lo:@L> "*" <hi:@R> => Operator::from_bin(BinOpKind::Mul, Span::new(lo, hi)),
+    <lo:@L> "/" <hi:@R> => Operator::from_bin(BinOpKind::Div, Span::new(lo, hi)),
+    <lo:@L> "%" <hi:@R> => Operator::from_bin(BinOpKind::Rem, Span::new(lo, hi)),
+    <lo:@L> "^" <hi:@R> => Operator::from_bin(BinOpKind::BitXor, Span::new(lo, hi)),
+    <lo:@L> "&" <hi:@R> => Operator::from_bin(BinOpKind::BitAnd, Span::new(lo, hi)),
+    <lo:@L> "|" <hi:@R> => Operator::from_bin(BinOpKind::BitOr, Span::new(lo, hi)),
+    <lo:@L> "<<" <hi:@R> => Operator::from_bin(BinOpKind::Shl, Span::new(lo, hi)),
+    <lo:@L> ">>" <hi:@R> => Operator::from_bin(BinOpKind::Shr, Span::new(lo, hi)),
+
+    <lo:@L> "[" "`" "]" <hi:@R> => Operator::Index(Span::new(lo, hi)),
+}
 
 // ------------------------------------------
 // Identifiers
@@ -222,9 +308,9 @@ Prerequisites: Prerequisites = {
 }
 
 UnOpKind: UnOpKind = {
-    "*" => UnOpKind::Deref,
+    "*`" => UnOpKind::Deref,
     "!" => UnOpKind::Not,
-    "-" => UnOpKind::Neg,
+    "-`" => UnOpKind::Neg,
 }
 
 UnOp: UnOp = {
@@ -235,26 +321,19 @@ UnOp: UnOp = {
 }
 
 ExprTupleField: TupleField = {
-    <lo:@L> <prereq:Prerequisites?> <hi:@R> <attrs:Attrs> <e:Expr> => TupleField {
-        prerequisites: prereq.unwrap_or_else(|| {
-            Prerequisites::from_span(Span::new(lo, hi))
-        }),
-        attrs: cx.take_attr(attrs),
-        visibility: Visibility {
-            kind: VisibilityKind::Inherited,
-            span: DUMMY_SPAN
-        },
-        expr: e,
-    },
     <lo:@L> <prereq:Prerequisites?> <hi:@R>
         <attrs:Attrs>
-        <vis:(@L Visibility @R)>
-    <e:ExprPath> => TupleField {
+        <vlo:@L> <vis:Visibility?> <vhi:@R>
+    <e:ExprUnannotated> => TupleField {
         prerequisites: prereq.unwrap_or_else(|| {
             Prerequisites::from_span(Span::new(lo, hi))
         }),
         attrs: cx.take_attr(attrs),
-        visibility: parse_vis(vis),
+        visibility: vis.map(|v| parse_vis((vlo, v, vhi)))
+            .unwrap_or_else(|| Visibility {
+                kind: VisibilityKind::Inherited,
+                span: Span::new(vlo, vhi)
+            }),
         expr: e,
     },
 }
@@ -319,8 +398,117 @@ ExprArray: P<Expr> = {
     }),
 }
 
+StructField: StructField = {
+    <lo:@L>
+        <prereq:(Prerequisites? @R)>
+        <attrs:OuterAttr*>
+        <vlo:@L> <vis:Visibility?> <vhi:@R>
+        <pat:PatAtomic> "=" <e:Expr>
+    <hi:@R> => StructField {
+        id: DUMMY_ID,
+        prerequisites: prereq.0.unwrap_or_else(|| {
+            Prerequisites::from_span(Span::new(lo, prereq.1))
+        }),
+        attrs: cx.take_attr(attrs),
+        visibility: vis.map_or(
+            Visibility {
+                kind: VisibilityKind::Inherited,
+                span: Span::new(vlo, vhi),
+            },
+            |v| parse_vis((vlo, v, vhi)),
+        ),
+        pat,
+        expr: e,
+        span: Span::new(lo, hi),
+    },
+}
+
+ExprStruct: P<Expr> = {
+    <lo:@L> "\\`" <i:Ident> "{" "}" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Struct(i, vec![]),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+    <lo:@L>  "\\`" <i:Ident> "{"
+        <first:StructField>
+        <next:(";" StructField)*> ";"?
+    "}" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Struct(
+            i,
+            [first]
+                .into_iter()
+                .chain(next.into_iter().map(|(_, f)| f))
+                .collect(),
+        ),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+}
+
+ExprUnloadedBlock: P<Expr> = {
+    <lo:@L> "`" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Block(P(Block {
+            id: DUMMY_ID,
+            kind: BlockKind::Unloaded,
+            is_unsafe: false,
+        })),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+}
+
+ExprBlock: P<Block> = {
+    <is_unsafe:"unsafe"?> "{" <lo:@L>
+        InnerAttr*
+        <mut stmts:Stmt*>
+        <last:StmtSemi?>
+    <hi:@R> "}" => P(Block {
+        id: DUMMY_ID,
+        kind: BlockKind::Loaded {
+            stmts: {
+                stmts.extend(last);
+                stmts
+            },
+            is_inline: false,
+            span: Span::new(lo, hi),
+        },
+        is_unsafe: is_unsafe.is_some(),
+    }),
+}
+
 ExprAtomic: P<Expr> = {
+    <lo:@L> "(" <op:Operator> ")" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Operator(op),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
     "(" <e:Expr> ")" => e,
+
+    <lo:@L> <block:ExprBlock> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Block(block),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "_" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Underscore,
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+    
+    <lo:@L> ".." <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Range(None, RangeLimits::HalfOpen, None),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
 
     <ident:Ident> => P(Expr {
         id: DUMMY_ID,
@@ -353,14 +541,26 @@ ExprPath: P<Expr> = {
     },
 }
 
-ExprDelimited: P<Expr> = {
+#[inline]
+ExprNonArray: P<Expr> = {
     ExprPath,
     ExprTuple,
+    ExprStruct,
+}
+
+ExprDelimited: P<Expr> = {
+    ExprNonArray,
     ExprArray,
+
+    <lo:@L> <e:ExprDelimited> "`[" <index:Expr> "]" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Index(e, index),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
 }
 
 ExprUnary: P<Expr> = {
-    #[precedence(level = "0")]
     ExprDelimited,
 
     <lo:@L> <un:UnOp> <e:ExprDelimited> <hi:@R> => {
@@ -372,23 +572,12 @@ ExprUnary: P<Expr> = {
         })
     },
 
-    <lo:@L> "&" <l:Lifetime?> <m:Mutability> <e:ExprUnary> <hi:@R> => P(Expr {
+    <lo:@L> "&`" <l:Lifetime?> <m:Mutability> <e:ExprUnary> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::AddrOf(l, m, e),
         span: Span::new(lo, hi),
         attrs: vec![],
     }),
-
-    #[precedence(level = "1")] #[assoc(side = "left")]
-    <func:ExprUnary> <arg:ExprDelimited> => {
-        let span = Span::new(func.span.start, arg.span.end);
-        P(Expr {
-            id: DUMMY_ID,
-            kind: ExprKind::Call(func, arg),
-            span,
-            attrs: vec![],
-        })
-    },
 }
 
 ExprBinary: P<Expr> = {
@@ -424,14 +613,6 @@ ExprBinary: P<Expr> = {
         expr::parse_bin(lhs, (op.0, BinOpKind::BitOr, op.2), rhs),
 
     #[precedence(level = "5")] #[assoc(side="left")]
-    <lhs:(@L ExprBinary?)> <r:RangeLimits> <rhs:(ExprBinary? @R)> => P(Expr {
-        id: DUMMY_ID,
-        kind: ExprKind::Range(lhs.1, r, rhs.0),
-        span: Span::new(lhs.0, rhs.1),
-        attrs: vec![],
-    }),
-
-    #[precedence(level = "6")] #[assoc(side="left")]
     <lhs:(@L ExprBinary)> <op:(@L "=="  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Eq, op.2), rhs),
     <lhs:(@L ExprBinary)> <op:(@L "!="  @R)> <rhs:(ExprBinary @R)> =>
@@ -445,28 +626,233 @@ ExprBinary: P<Expr> = {
     <lhs:(@L ExprBinary)> <op:(@L ">="  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Ge, op.2), rhs),
 
-    #[precedence(level = "7")] #[assoc(side="left")]
+    #[precedence(level = "6")] #[assoc(side="left")]
     <lhs:(@L ExprBinary)> <op:(@L "&&"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::And, op.2), rhs),
 
-    #[precedence(level = "8")] #[assoc(side="left")]
+    #[precedence(level = "7")] #[assoc(side="left")]
     <lhs:(@L ExprBinary)> <op:(@L "||"  @R)> <rhs:(ExprBinary @R)> =>
         expr::parse_bin(lhs, (op.0, BinOpKind::Or, op.2), rhs),
+
+    #[precedence(level = "8")] #[assoc(side = "left")]
+    <lo:@L> <lhs:ExprBinary> "`..=`" <rhs:ExprBinary> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Range(Some(lhs), RangeLimits::Closed, Some(rhs)),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+    <lo:@L> <lhs:ExprBinary> "`.." <rhs:ExprBinary?> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Range(Some(lhs), RangeLimits::HalfOpen, rhs),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    #[precedence(level = "9")]
+    <r:RangeTo<ExprBinary>> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Range(None, r.0, Some(r.1)),
+        span: r.2,
+        attrs: vec![],
+    })
 }
 
-pub Expr: P<Expr> = {
+MatchArm: MatchArm = {
+    <lo:@L> <prereq:Prerequisites?> <hi:@R>
+    <attrs:Attrs>
+    <pat:Pat> <guard:("if" Expr)?> "=>" <expr:Expr> => MatchArm {
+        prerequisites: prereq.unwrap_or_else(|| {
+            Prerequisites::from_span(Span::new(lo, hi))
+        }),
+        attrs: cx.take_attr(attrs),
+        pat,
+        guard: guard.map(|(_, expr)| expr),
+        expr,
+    }
+}
+
+ExprUnannotated: P<Expr> = {
     ExprBinary,
 
-    <lo:@L> "try" <e:ExprBinary> <hi:@R> => P(Expr {
+    <func:ExprUnary> <arg:ExprBinary> => {
+        let span = Span::new(func.span.start, arg.span.end);
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::Call(func, arg),
+            span,
+            attrs: vec![],
+        })
+    },
+
+    <lo:@L> <lhs:ExprDelimited> <op:(@L "=" @R)> <rhs:Expr> <hi:@R> => {
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::Assign(lhs, Span::new(op.0, op.2), rhs),
+            span: Span::new(lo, hi),
+            attrs: vec![],
+        })
+    },
+
+    <lo:@L> <lhs:ExprDelimited> <op:AssignOp> <rhs:Expr> <hi:@R> => {
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::AssignOp(lhs, op, rhs),
+            span: Span::new(lo, hi),
+            attrs: vec![],
+        })
+    },
+
+    <lo:@L> <lhs:ExprDelimited> ":" <rhs:Expr> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::BelongsTo(lhs, rhs),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "\\" <arg:PatOp> "->" <body:(Expr @R)> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Lambda(arg, body.0),
+        span: Span::new(lo, body.1),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "if" <pred:Expr> "then" <e:Expr> "else" <other:Expr> <hi:@R> => {
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::If(pred, e, Some(other)),
+            span: Span::new(lo, hi),
+            attrs: vec![],
+        })
+    },
+
+    <lo:@L> "while" <pred:Expr> "do" <body:Expr> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::While(pred, body),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "loop" <body:Expr> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Loop(body),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "for" <pat:Pat> "in" <e:Expr> "do" <body:Expr> <hi:@R> => {
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::ForLoop(pat, e, body),
+            span: Span::new(lo, hi),
+            attrs: vec![],
+        })
+    },
+
+    <lo:@L> "match" <pred:Expr> "with" "{" "}" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Match(pred, vec![]),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "match" <pred:Expr> "with" "{"
+        <first:MatchArm> <next:("," MatchArm)*> ","?
+    "}" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Match(
+            pred,
+            [first]
+                .into_iter()
+                .chain(next.into_iter().map(|n| n.1))
+                .collect()
+        ),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "try" <e:Expr> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Try(e),
         span: Span::new(lo, hi),
         attrs: vec![],
     }),
 
-    <lo:@L> "exists" <e:ExprBinary> <hi:@R> => P(Expr {
+    <lo:@L> "exists" <e:Expr> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Exists(e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "break" <l:Lifetime?> <e:Expr?> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Break(l, e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "continue" <l:Lifetime?> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Continue(l),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> "return" <e:Expr?> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Return(e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+}
+
+LetExpr: P<Expr> = {
+    Expr,
+    ExprUnloadedBlock,
+}
+
+Let: Let = {
+    <lo:@L> <prereq:Prerequisites?> <hi:@R>
+    <attrs:Attrs>
+    <vlo:@L> <vis:Visibility?> <vhi:@R>
+    "let" <is_unsafe:"unsafe"?> <pat:PatOp> "=" <expr:LetExpr> => Let {
+        prerequisites: prereq.unwrap_or_else(|| {
+            Prerequisites::from_span(Span::new(lo, hi))
+        }),
+        attrs: cx.take_attr(attrs),
+        visibility: vis.map_or(
+            Visibility {
+                kind: VisibilityKind::Inherited,
+                span: Span::new(vlo, vhi),
+            },
+            |v| parse_vis((vlo, v, vhi)),
+        ),
+        is_unsafe: is_unsafe.is_some(),
+        pat,
+        expr,
+    },
+}
+
+Expr: P<Expr> = {
+    ExprUnannotated,
+
+    <lo:@L> <l:Lifetime> ":" <e:ExprUnannotated> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Annotated(l, e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> <prereq:Prerequisites> <e:ExprUnannotated> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Prereq(prereq, e),
+        span: Span::new(lo, hi),
+        attrs: vec![],
+    }),
+
+    <lo:@L> <l:Let> <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Let(l),
         span: Span::new(lo, hi),
         attrs: vec![],
     }),
@@ -527,23 +913,17 @@ PatArray: P<Pat> = {
 
 PatField: PatField = {
     <lo:@L>
-        <attrs:Attrs>
-        <i:@L> <mode:BindingMode> <m:Mutability> <ident:Ident>
+        <mode:BindingMode> <m:Mutability> <ident:Ident>
     <hi:@R> => PatField {
-        attrs: cx.take_attr(attrs),
         id: DUMMY_ID,
         ident,
-        pat: pat::parse_ident(Span::new(i, hi), mode, m, ident),
+        pat: pat::parse_ident(Span::new(lo, hi), mode, m, ident),
         span: Span::new(lo, hi),
         is_shorthand: false,
         is_placeholder: false,
     },
 
-    <lo:@L>
-        <attrs:Attrs>
-        <ident:Ident> "=" <pat:PatAtomic>
-    <hi:@R> => PatField {
-        attrs: cx.take_attr(attrs),
+    <lo:@L> <ident:Ident> "=" <pat:PatAtomic> <hi:@R> => PatField {
         id: DUMMY_ID,
         ident,
         pat,
@@ -574,7 +954,6 @@ PatStruct: P<Pat> = {
         ),
         span: Span::new(lo, hi),
     }),
-
 }
 
 PatAtomic: P<Pat> = {
@@ -589,6 +968,12 @@ PatAtomic: P<Pat> = {
         kind: PatKind::Wildcard,
         span: Span::new(lo, hi)
     }),
+    
+    <lo:@L> ".." <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Range(None, RangeLimits::HalfOpen, None),
+        span: Span::new(lo, hi),
+    }),
 
     <lo:@L> <lit:"literal"> <hi:@R> => P(Pat {
         id: DUMMY_ID,
@@ -599,7 +984,6 @@ PatAtomic: P<Pat> = {
     PatArray,
     PatTuple,
     PatStruct,
-
 }
 
 PatOp: P<Pat> = {
@@ -607,20 +991,37 @@ PatOp: P<Pat> = {
     PatAtomic,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <lhs:(@L PatOp?)> <r:RangeLimits> <rhs:(PatOp? @R)> => P(Pat {
+    <lo:@L> <lhs:PatOp> "`..=`" <rhs:PatOp> <hi:@R> => P(Pat {
         id: DUMMY_ID,
-        kind: PatKind::Range(lhs.1, r, rhs.0),
-        span: Span::new(lhs.0, rhs.1),
+        kind: PatKind::Range(Some(lhs), RangeLimits::Closed, Some(rhs)),
+        span: Span::new(lo, hi),
+    }),
+    <lo:@L> <lhs:PatOp> "`..`" <rhs:PatOp> <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Range(Some(lhs), RangeLimits::HalfOpen, Some(rhs)),
+        span: Span::new(lo, hi),
+    }),
+    <lo:@L> <lhs:PatOp> "`.." <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Range(Some(lhs), RangeLimits::HalfOpen, None),
+        span: Span::new(lo, hi),
     }),
 
     #[precedence(level = "2")]
-    <lo:@L> "&" <l:Lifetime?> <m:Mutability> <i:PatOp> <hi:@R> => P(Pat {
+    <r:RangeTo<PatOp>> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Range(None, r.0, Some(r.1)),
+        span: r.2,
+    }),
+
+    #[precedence(level = "3")]
+    <lo:@L> "&`" <l:Lifetime?> <m:Mutability> <i:PatOp> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Deref(l, m, i),
         span: Span::new(lo, hi),
     }),
 
-    #[precedence(level = "3")]
+    #[precedence(level = "4")]
     <lo:@L>
         <i_lo:@L> <mode:BindingMode> <m:Mutability> <ident:Ident> <i_hi:@R>
         <alias:("@" PatOp)?>
@@ -629,9 +1030,16 @@ PatOp: P<Pat> = {
         kind: PatKind::Ident(mode, m, ident, alias.map(|p| p.1)),
         span: Span::new(lo, hi)
     }),
+
+    #[precedence(level = "5")] #[assoc(side = "left")]
+    <lo:@L> <func:PatOp> <arg:PatOp> <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Call(func, arg),
+        span: Span::new(lo, hi),
+    }),
 }
 
-pub Pat: P<Pat> = {
+Pat: P<Pat> = {
     PatOp,
 
     <lo:@L> <lhs:(PatOp "|")+> <rhs:PatOp> <hi:@R> => P(Pat {
@@ -639,6 +1047,39 @@ pub Pat: P<Pat> = {
         kind: PatKind::Or(lhs.into_iter().map(|p| p.0).chain([rhs]).collect()),
         span: Span::new(lo, hi),
     }),
+}
+
+// ------------------------------------------
+// Statements
+
+Stmt: P<Stmt> = {
+    <lo:@L> <e:Expr> ";" <hi:@R> => P(Stmt {
+        id: DUMMY_ID,
+        kind: StmtKind::Expr(e),
+        span: Span::new(lo, hi),
+    }),
+
+    <lo:@L> ";" <hi:@R> => P(Stmt {
+        id: DUMMY_ID,
+        kind: StmtKind::Empty,
+        span: Span::new(lo, hi),
+    }),
+}
+
+StmtSemi: P<Stmt> = {
+    <e:Expr> => {
+        let span = e.span;
+        P(Stmt {
+            id: DUMMY_ID,
+            kind: StmtKind::Semi(e),
+            span,
+        })
+    },
+}
+
+pub Stmts: Vec<P<Stmt>> = {
+    <stmts:Stmt*> <fin:StmtSemi?> =>
+        stmts.into_iter().chain(fin).collect(),
 }
 
 __unused: PhantomData<&'diag ()> = {

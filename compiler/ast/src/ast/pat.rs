@@ -1,12 +1,11 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, Lifetime, Mutability, RangeLimits, P};
+use super::{Lifetime, Mutability, RangeLimits, P};
 use crate::token;
 
 /// `#[attrs] ident = pat`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PatField {
-    pub attrs: Vec<Attribute>,
     pub id: u32,
     pub ident: Ident,
     pub pat: P<Pat>,
@@ -43,6 +42,8 @@ pub enum PatKind {
     Range(Option<P<Pat>>, RangeLimits, Option<P<Pat>>),
     /// `(pat)`
     Paren(P<Pat>),
+    /// `func arg`
+    Call(P<Pat>, P<Pat>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

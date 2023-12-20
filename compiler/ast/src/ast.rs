@@ -4,7 +4,6 @@ mod pat;
 mod pointer;
 
 use dendro_span::{
-    ident::Ident,
     span::{DelimSpan, Span},
     symbol::Symbol,
 };
@@ -17,10 +16,16 @@ use crate::{
 
 pub const DUMMY_ID: u32 = u32::MAX;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Spanned<T> {
     pub kind: T,
     pub span: Span,
+}
+
+impl<T> Spanned<T> {
+    pub fn new(kind: T, span: Span) -> Self {
+        Spanned { kind, span }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -67,26 +72,7 @@ pub struct Attribute {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum UseTreeKind {
-    /// `use prefix::ident`
-    Simple(Option<Ident>),
-    /// `use prefix::{nested..}`
-    Nested(Vec<UseTree>),
-    /// `use prefix::*`
-    Glob,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct UseTree {
-    pub prefix: P<Expr>,
-    pub kind: UseTreeKind,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StmtKind {
-    /// `use prefix::{a, b, c};`
-    Use(Visibility, UseTree),
     /// `expr;`
     Expr(P<Expr>),
     /// `expr`

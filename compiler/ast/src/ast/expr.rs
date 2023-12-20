@@ -3,7 +3,7 @@ use dendro_span::{ident::Ident, span::Span};
 use super::{Attribute, Lifetime, Mutability, Pat, Spanned, Stmt, Visibility, DUMMY_ID, P};
 use crate::token;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinOpKind {
     /// `*`
     Mul,
@@ -45,7 +45,7 @@ pub enum BinOpKind {
 
 pub type BinOp = Spanned<BinOpKind>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnOpKind {
     /// `*`
     Deref,
@@ -56,6 +56,38 @@ pub enum UnOpKind {
 }
 
 pub type UnOp = Spanned<UnOpKind>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Operator {
+    /// `(+)`
+    Binary(BinOp),
+    /// `(`\``!)`
+    Unary(UnOp),
+    /// `(=)`
+    Assign(Span),
+    /// `(+=)`
+    AssignBinary(BinOp),
+    /// `([`\``])`
+    Index(Span),
+}
+
+impl Operator {
+    pub fn from_bin(kind: BinOpKind, span: Span) -> Self {
+        Operator::Binary(BinOp { kind, span })
+    }
+
+    pub fn from_un(kind: UnOpKind, span: Span) -> Self {
+        Operator::Unary(UnOp { kind, span })
+    }
+
+    pub fn from_assign(span: Span) -> Self {
+        Operator::Assign(span)
+    }
+
+    pub fn from_assign_bin(kind: BinOpKind, span: Span) -> Self {
+        Operator::AssignBinary(BinOp { kind, span })
+    }
+}
 
 /// `forall a where a > 1 ::`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -80,8 +112,10 @@ impl Prerequisites {
 /// `pub let x a = a`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Let {
+    pub prerequisites: Prerequisites,
     pub attrs: Vec<Attribute>,
     pub visibility: Visibility,
+    pub is_unsafe: bool,
     pub pat: P<Pat>,
     pub expr: P<Expr>,
 }
@@ -151,6 +185,8 @@ pub enum ExprKind {
     Ident(Ident),
     /// `"abcde"`
     Literal(token::Lit),
+    /// `(+)`
+    Operator(Operator),
     /// `expr .call`
     InfixCall(P<Expr>, Span, P<Expr>),
     /// `forall a where a > 1 :: expr`
@@ -165,7 +201,7 @@ pub enum ExprKind {
     Loop(P<Expr>),
     /// `for item in expr do body`
     ForLoop(P<Pat>, P<Expr>, P<Expr>),
-    /// `match predicate on { arms.. }`
+    /// `match predicate { arms.. }`
     Match(P<Expr>, Vec<MatchArm>),
     /// `&'lifetime #mutability expr`
     AddrOf(Option<Lifetime>, Mutability, P<Expr>),
@@ -185,7 +221,7 @@ pub enum ExprKind {
     Annotated(Lifetime, P<Expr>),
     /// `{ expr }` or `unsafe { expr }`
     Block(P<Block>),
-    /// `param -> body`
+    /// `\param -> body`
     Lambda(P<Pat>, P<Expr>),
     /// `lhs = rhs`
     ///
@@ -212,7 +248,7 @@ pub enum ExprKind {
     /// `exists expr`.
     Exists(P<Expr>),
     /// `a: b`,
-    BelongsTo(P<Expr>, Span, P<Expr>),
+    BelongsTo(P<Expr>, P<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

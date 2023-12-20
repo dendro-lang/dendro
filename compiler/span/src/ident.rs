@@ -52,6 +52,9 @@ keywords![
     LEAF: "leaf",
     TRY: "try",
     REF: "ref",
+    THEN: "then",
+    DO: "do",
+    WITH: "with",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
