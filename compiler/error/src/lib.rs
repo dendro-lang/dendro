@@ -149,7 +149,7 @@ impl DiagCx {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DiagnosticBuilder<'a> {
     cx: Option<&'a DiagCx>,
     pub diag: Diagnostic,

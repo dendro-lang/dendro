@@ -40,6 +40,14 @@ pub enum VisibilityKind {
 
 pub type Visibility = Spanned<VisibilityKind>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PathRoot {
+    Leaf,
+    Super,
+    /// `self`
+    This,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AttrArgs {
     /// `#[attr]`

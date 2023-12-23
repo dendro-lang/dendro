@@ -1,6 +1,8 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, Lifetime, Mutability, Pat, Spanned, Stmt, Visibility, DUMMY_ID, P};
+use super::{
+    Attribute, Lifetime, Mutability, Pat, PathRoot, Spanned, Stmt, Visibility, DUMMY_ID, P,
+};
 use crate::token;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -109,14 +111,12 @@ impl Prerequisites {
     }
 }
 
-/// `pub let x a = a`
+/// `let x a := a`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Let {
-    pub prerequisites: Prerequisites,
-    pub attrs: Vec<Attribute>,
-    pub visibility: Visibility,
     pub is_unsafe: bool,
     pub pat: P<Pat>,
+    pub ty: Option<P<Expr>>,
     pub expr: P<Expr>,
 }
 
@@ -136,15 +136,6 @@ pub enum RangeLimits {
     HalfOpen,
     /// Inclusive at the beginning and end
     Closed,
-}
-
-/// `#[attrs] pub expr`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TupleField {
-    pub prerequisites: Prerequisites,
-    pub attrs: Vec<Attribute>,
-    pub visibility: Visibility,
-    pub expr: P<Expr>,
 }
 
 /// `#[attrs] pub pat = expr`
@@ -183,6 +174,8 @@ pub struct Block {
 pub enum ExprKind {
     /// `ident`
     Ident(Ident),
+    /// `abc::def`,
+    Path(PathRoot, Vec<P<Expr>>),
     /// `"abcde"`
     Literal(token::Lit),
     /// `(+)`
@@ -191,6 +184,10 @@ pub enum ExprKind {
     InfixCall(P<Expr>, Span, P<Expr>),
     /// `forall a where a > 1 :: expr`
     Prereq(Prerequisites, P<Expr>),
+    /// `pub(in path) expr`
+    ///
+    /// This is rare, and will be reduced soon after parsing.
+    Vis(Visibility, P<Expr>),
     /// `let x a = a`
     Let(Let),
     /// `if predicate then body else other`
@@ -214,15 +211,15 @@ pub enum ExprKind {
     /// `[repeated; count]`
     ArrayRepeated(P<Expr>, P<Expr>),
     /// `(a, b, c)`
-    Tuple(Vec<TupleField>),
+    Tuple(Vec<P<Expr>>),
     /// `Struct { x = a; y = { b } z = c; }`
     Struct(Ident, Vec<StructField>),
     /// `'life: expr`
     Annotated(Lifetime, P<Expr>),
     /// `{ expr }` or `unsafe { expr }`
     Block(P<Block>),
-    /// `\param -> body`
-    Lambda(P<Pat>, P<Expr>),
+    /// `\param: type -> body`
+    Lambda(P<Pat>, Option<P<Expr>>, P<Expr>),
     /// `lhs = rhs`
     ///
     /// `span` is the span of `=`.

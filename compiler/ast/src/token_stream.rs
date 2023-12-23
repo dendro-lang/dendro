@@ -184,6 +184,26 @@ impl<'a> CursorRef<'a> {
             _ => None,
         }
     }
+
+    pub fn lookahead(&self, n: usize) -> Option<&'a TokenTree> {
+        self.0.get(n).map(|(tree, _)| tree)
+    }
+
+    pub fn next_pos(&self, mut pred: impl FnMut(&TokenTree, Spacing) -> bool) -> Option<usize> {
+        self.0
+            .iter()
+            .position(|&(ref tree, spacing)| pred(tree, spacing))
+    }
+
+    pub fn split_first(self, pred: impl FnMut(&TokenTree, Spacing) -> bool) -> (Self, Self) {
+        match self.next_pos(pred) {
+            Some(pos) => {
+                let (a, b) = self.0.split_at(pos);
+                (CursorRef(a), CursorRef(b))
+            }
+            None => (self, CursorRef(&[])),
+        }
+    }
 }
 
 impl<'a> Iterator for CursorRef<'a> {
@@ -216,8 +236,14 @@ impl Cursor {
         self.next_with_spacing_ref().cloned()
     }
 
-    pub fn look_ahead(&self, n: usize) -> Option<&TokenTree> {
+    pub fn lookahead(&self, n: usize) -> Option<&TokenTree> {
         self.stream.0[self.index..].get(n).map(|(tree, _)| tree)
+    }
+
+    pub fn next_pos(&self, mut pred: impl FnMut(&TokenTree, Spacing) -> bool) -> Option<usize> {
+        self.stream.0[self.index..]
+            .iter()
+            .position(|&(ref tree, spacing)| pred(tree, spacing))
     }
 
     pub fn into_stream(self) -> TokenStream {
