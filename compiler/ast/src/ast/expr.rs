@@ -138,7 +138,7 @@ pub enum RangeLimits {
     Closed,
 }
 
-/// `#[attrs] pub pat = expr`
+/// `#[attrs] pub pat: expr`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StructField {
     pub prerequisites: Prerequisites,
@@ -148,6 +148,14 @@ pub struct StructField {
     pub visibility: Visibility,
     pub pat: P<Pat>,
     pub expr: P<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub enum StructRest {
+    Base(P<Expr>),
+    Rest,
+    #[default]
+    None,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -212,8 +220,8 @@ pub enum ExprKind {
     ArrayRepeated(P<Expr>, P<Expr>),
     /// `(a, b, c)`
     Tuple(Vec<P<Expr>>),
-    /// `Struct { x = a; y = { b } z = c; }`
-    Struct(Ident, Vec<StructField>),
+    /// `\{ x: a, y: b }`
+    Struct(Vec<StructField>, StructRest),
     /// `'life: expr`
     Annotated(Lifetime, P<Expr>),
     /// `{ expr }` or `unsafe { expr }`

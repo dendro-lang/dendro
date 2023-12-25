@@ -65,7 +65,8 @@ extern {
         ">>=" => (_, T(token::BinOpEq(token::Shr)), _),
 
         "@" => (_, T(token::At), _),
-        "." => (_, T(token::Dot), _),
+        "." => (Spacing::Alone, T(token::Dot), _),
+        "`." => (Spacing::Joint, T(token::Dot), _),
         ".." => (Spacing::Alone, T(token::DotDot), Spacing::Alone),
         "`.." => (Spacing::Joint, T(token::DotDot), Spacing::Alone),
         "..`" => (Spacing::Alone, T(token::DotDot), Spacing::Joint),
@@ -140,20 +141,6 @@ extern {
 
 // ------------------------------------------
 // Units
-
-#[inline]
-OpenDelim: Delimiter = {
-    "(" => Delimiter::Parenthesis,
-    "[" => Delimiter::Bracket,
-    "{" => Delimiter::Brace,
-}
-
-#[inline]
-CloseDelim: Delimiter = {
-    ")" => Delimiter::Parenthesis,
-    "]" => Delimiter::Bracket,
-    "}" => Delimiter::Brace,
-}
 
 #[inline]
 Visibility: VisibilityKind = {
@@ -382,7 +369,7 @@ StructField: StructField = {
         <prereq:(Prerequisites? @R)>
         <attrs:Attrs>
         <vlo:@L> <vis:Visibility?> <vhi:@R>
-        <pat:PatAtomic> "=" <e:Expr>
+        <pat:PatAtomic> ":" <e:Expr>
     <hi:@R> => StructField {
         id: DUMMY_ID,
         prerequisites: prereq.0.unwrap_or_else(|| {
@@ -402,24 +389,47 @@ StructField: StructField = {
     },
 }
 
+#[inline]
+StructRest: StructRest = {
+    "..`" <e:Expr> => StructRest::Base(e),
+    ".." => StructRest::Rest,
+}
+
 ExprStruct: P<Expr> = {
-    <lo:@L> "\\`" <i:Ident> "{" "}" <hi:@R> => P(Expr {
+    <lo:@L> "\\`" "{" <rest:StructRest?> "}" <hi:@R> => P(Expr {
         id: DUMMY_ID,
-        kind: ExprKind::Struct(i, vec![]),
+        kind: ExprKind::Struct(vec![], rest.unwrap_or_default()),
         span: Span::new(lo, hi),
         attrs: cx.take_attr(vec![]),
     }),
-    <lo:@L>  "\\`" <i:Ident> "{"
+
+    <lo:@L>  "\\`" "{"
         <first:StructField>
-        <next:(";" StructField)*> ";"?
+        <next:("," StructField)*> ","?
     "}" <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Struct(
-            i,
             [first]
                 .into_iter()
                 .chain(next.into_iter().map(|(_, f)| f))
                 .collect(),
+            StructRest::None,
+        ),
+        span: Span::new(lo, hi),
+        attrs: cx.take_attr(vec![]),
+    }),
+
+    <lo:@L>  "\\`" "{"
+        <first:StructField>
+        <next:("," StructField)*> "," <rest:StructRest>
+    "}" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Struct(
+            [first]
+                .into_iter()
+                .chain(next.into_iter().map(|(_, f)| f))
+                .collect(),
+            rest,
         ),
         span: Span::new(lo, hi),
         attrs: cx.take_attr(vec![]),
@@ -549,7 +559,7 @@ ExprDelimited: P<Expr> = {
     }),
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <e:ExprDelimited> <op:(@L "." @R)> <func:ExprDelimited> => {
+    <e:ExprDelimited> <op:(@L "`." @R)> <func:ExprPath> => {
         let span = Span::new(e.span.start, func.span.end);
         P(Expr {
             id: DUMMY_ID,
@@ -689,7 +699,7 @@ ExprUnannotated: P<Expr> = {
 
     #[precedence(level = "1")] #[assoc(side = "left")]
 
-    <func:ExprUnary> <arg:ExprBinary> => {
+    <func:ExprUnannotated> <arg:ExprUnannotated> => {
         let span = Span::new(func.span.start, arg.span.end);
         P(Expr {
             id: DUMMY_ID,
@@ -941,7 +951,7 @@ PatField: PatField = {
         is_placeholder: false,
     },
 
-    <lo:@L> <ident:Ident> "=" <pat:PatOp> <hi:@R> => PatField {
+    <lo:@L> <ident:Ident> ":" <pat:PatOp> <hi:@R> => PatField {
         id: DUMMY_ID,
         ident,
         pat,
@@ -952,23 +962,38 @@ PatField: PatField = {
 }
 
 PatStruct: P<Pat> = {
-    <lo:@L> <ident:Ident> "{" "}" <hi:@R> => P(Pat {
+    <lo:@L> "\\`" "{" <recover:".."?> "}" <hi:@R> => P(Pat {
         id: DUMMY_ID,
-        kind: PatKind::Struct(ident, vec![]),
+        kind: PatKind::Struct(vec![], recover.is_some()),
         span: Span::new(lo, hi),
     }),
 
-    <lo:@L> <ident:Ident> "{"
+    <lo:@L> "\\`" "{"
         <first:PatField>
-        <fields:(";" PatField)*> ";"?
+        <fields:("," PatField)*> ","?
     "}" <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Struct(
-            ident,
             vec![first]
                 .into_iter()
                 .chain(fields.into_iter().map(|n| n.1))
                 .collect(),
+            false,
+        ),
+        span: Span::new(lo, hi),
+    }),
+
+    <lo:@L> "\\`" "{"
+        <first:PatField>
+        <fields:("," PatField)*> "," ".."
+    "}" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Struct(
+            vec![first]
+                .into_iter()
+                .chain(fields.into_iter().map(|n| n.1))
+                .collect(),
+            true,
         ),
         span: Span::new(lo, hi),
     }),

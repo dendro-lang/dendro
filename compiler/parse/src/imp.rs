@@ -83,6 +83,7 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
         Some(match self.current.next_with_spacing() {
             Some(&(TokenTree::Token(Token { kind, span }), end)) => {
                 if let Some(ret) = self.parse_attr(kind, span) {
+                    self.last_spacing = Spacing::Alone;
                     return Some(ret);
                 }
                 let start = mem::replace(&mut self.last_spacing, end);
@@ -177,8 +178,6 @@ pub fn parse<'diag>(diag: &'diag DiagCx, input: &TokenStream) -> Result<Leaf, Pa
 
 #[cfg(test)]
 mod tests {
-    use dendro_span::ident::kw;
-
     use super::*;
 
     #[test]
@@ -193,14 +192,27 @@ mod tests {
 
     #[test]
     fn let_expr() {
-        assert_eq!(kw::WHERE, "where");
-
         let diag = DiagCx::new();
         let tts = dendro_lexer::parse(
             "
             forall r where r: u32 ::
             #[allow(unused)]
             pub unsafe let a r := r;",
+            &diag,
+        );
+
+        let ts = parse(&diag, &tts).unwrap();
+
+        println!("{:#?}", ts);
+    }
+
+    #[test]
+    fn let_function() {
+        let diag = DiagCx::new();
+        let tts = dendro_lexer::parse(
+            "
+            forall t, a, b, c where a: t, b: t, c: t ::
+            pub let delta a b c := (b.pow 2) - ((*) 4 a) * c;",
             &diag,
         );
 

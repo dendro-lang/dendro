@@ -3,7 +3,7 @@ use dendro_span::{ident::Ident, span::Span};
 use super::{Lifetime, Mutability, PathRoot, RangeLimits, P};
 use crate::token;
 
-/// `#[attrs] ident = pat`
+/// `#[attrs] ident: pat`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PatField {
     pub id: u32,
@@ -32,8 +32,8 @@ pub enum PatKind {
     Array(Vec<P<Pat>>),
     /// `(a, b, c)`
     Tuple(Vec<P<Pat>>),
-    /// `Struct { a = x; b; c }`
-    Struct(Ident, Vec<PatField>),
+    /// `Struct { a: x, b, c }`
+    Struct(Vec<PatField>, bool),
     /// `A | B`
     Or(Vec<P<Pat>>),
     /// `&'a mut x`
