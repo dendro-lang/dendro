@@ -32,6 +32,7 @@ extern {
         ">" => (_, T(token::Gt), _),
         "&&" => (_, T(token::AndAnd), _),
         "||" => (_, T(token::OrOr), _),
+        "++" => (_, T(token::PlusPlus), _),
         "!" => (_, T(token::Not), _),
         "~" => (_, T(token::Tilde), _),
         "`" => (_, T(token::BackQuote), _),
@@ -697,6 +698,13 @@ ExprUnannotated: P<Expr> = {
     #[precedence(level = "0")]
     ExprBinary,
 
+    <lo:@L> "\\" <arg:PatOp> <ty:(":" Expr)?> "->" <body:(ExprBinary @R)> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Lambda(arg, ty.map(|ty| ty.1), body.0),
+        span: Span::new(lo, body.1),
+        attrs: cx.take_attr(vec![]),
+    }),
+
     #[precedence(level = "1")] #[assoc(side = "left")]
 
     <func:ExprUnannotated> <arg:ExprUnannotated> => {
@@ -709,7 +717,33 @@ ExprUnannotated: P<Expr> = {
         })
     },
 
-    #[precedence(level = "2")] #[assoc(side = "right")]
+    <e:ExprUnannotated> <op:(@L "." @R)> <func:ExprPath> => {
+        let span = Span::new(e.span.start, func.span.end);
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::InfixCall(e, Span::new(op.0, op.2), func),
+            span,
+            attrs: cx.take_attr(vec![]),
+        })
+    },
+
+    #[precedence(level = "2")] #[assoc(side = "left")]
+    <mut lhs:ExprUnannotated> "++" <rhs:ExprUnannotated> => match &mut lhs.kind {
+        ExprKind::Enum(e) => {
+            let end = rhs.span.end;
+            e.push(rhs);
+            lhs.span.end = end;
+            lhs
+        }
+        _ => P(Expr {
+            id: DUMMY_ID,
+            span: Span::new(lhs.span.start, rhs.span.end),
+            kind: ExprKind::Enum(vec![lhs, rhs]),
+            attrs: cx.take_attr(vec![]),
+        })
+    },
+
+    #[precedence(level = "3")] #[assoc(side = "right")]
 
     <lo:@L> <lhs:ExprDelimited> <op:(@L "=" @R)> <rhs:Expr> <hi:@R> => {
         P(Expr {
@@ -736,14 +770,7 @@ ExprUnannotated: P<Expr> = {
         attrs: cx.take_attr(vec![]),
     }),
 
-    <lo:@L> "\\" <arg:PatOp> <ty:(":" Expr)?> "->" <body:(Expr @R)> => P(Expr {
-        id: DUMMY_ID,
-        kind: ExprKind::Lambda(arg, ty.map(|ty| ty.1), body.0),
-        span: Span::new(lo, body.1),
-        attrs: cx.take_attr(vec![]),
-    }),
-
-    #[precedence(level = "3")] #[assoc(side = "right")]
+    #[precedence(level = "4")]
 
     <lo:@L>
         <is_unsafe:"KW:unsafe"?> "KW:let" <pat:PatOp>
@@ -761,9 +788,10 @@ ExprUnannotated: P<Expr> = {
         attrs: cx.take_attr(vec![]),
     }),
 
-    #[precedence(level = "4")]
-
-    <lo:@L> "KW:if" <pred:Expr> "KW:then" <e:Expr> "KW:else" <other:Expr> <hi:@R> => {
+    <lo:@L> "KW:if" <pred:Expr>
+        "KW:then" <e:ExprUnannotated>
+        "KW:else" <other:ExprUnannotated>
+    <hi:@R> => {
         P(Expr {
             id: DUMMY_ID,
             kind: ExprKind::If(pred, e, Some(other)),
@@ -772,21 +800,23 @@ ExprUnannotated: P<Expr> = {
         })
     },
 
-    <lo:@L> "KW:while" <pred:Expr> "KW:do" <body:Expr> <hi:@R> => P(Expr {
+    <lo:@L> "KW:while" <pred:Expr> "KW:do" <body:ExprUnannotated> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::While(pred, body),
         span: Span::new(lo, hi),
         attrs: cx.take_attr(vec![]),
     }),
 
-    <lo:@L> "KW:loop" <body:Expr> <hi:@R> => P(Expr {
+    <lo:@L> "KW:loop" <body:ExprUnannotated> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Loop(body),
         span: Span::new(lo, hi),
         attrs: cx.take_attr(vec![]),
     }),
 
-    <lo:@L> "KW:for" <pat:Pat> "KW:in" <e:Expr> "KW:do" <body:Expr> <hi:@R> => {
+    <lo:@L> "KW:for" <pat:Pat> "KW:in" <e:Expr>
+        "KW:do" <body:ExprUnannotated>
+    <hi:@R> => {
         P(Expr {
             id: DUMMY_ID,
             kind: ExprKind::ForLoop(pat, e, body),
@@ -817,21 +847,14 @@ ExprUnannotated: P<Expr> = {
         attrs: cx.take_attr(vec![]),
     }),
 
-    <lo:@L> "KW:try" <e:Expr> <hi:@R> => P(Expr {
-        id: DUMMY_ID,
-        kind: ExprKind::Try(e),
-        span: Span::new(lo, hi),
-        attrs: cx.take_attr(vec![]),
-    }),
-
-    <lo:@L> "KW:exists" <e:Expr> <hi:@R> => P(Expr {
+    <lo:@L> "KW:exists" <e:ExprUnannotated> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Exists(e),
         span: Span::new(lo, hi),
         attrs: cx.take_attr(vec![]),
     }),
 
-    <lo:@L> "KW:break" <l:Lifetime?> <e:Expr?> <hi:@R> => P(Expr {
+    <lo:@L> "KW:break" <l:Lifetime?> <e:ExprUnannotated?> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Break(l, e),
         span: Span::new(lo, hi),
@@ -845,7 +868,7 @@ ExprUnannotated: P<Expr> = {
         attrs: cx.take_attr(vec![]),
     }),
 
-    <lo:@L> "KW:return" <e:Expr?> <hi:@R> => P(Expr {
+    <lo:@L> "KW:return" <e:ExprUnannotated?> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Return(e),
         span: Span::new(lo, hi),

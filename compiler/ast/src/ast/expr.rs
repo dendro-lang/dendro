@@ -222,6 +222,8 @@ pub enum ExprKind {
     Tuple(Vec<P<Expr>>),
     /// `\{ x: a, y: b }`
     Struct(Vec<StructField>, StructRest),
+    /// `Some x ++ None`
+    Enum(Vec<P<Expr>>),
     /// `'life: expr`
     Annotated(Lifetime, P<Expr>),
     /// `{ expr }` or `unsafe { expr }`

@@ -220,4 +220,34 @@ mod tests {
 
         println!("{:#?}", ts);
     }
+
+    #[test]
+    fn chained_call() {
+        let diag = DiagCx::new();
+        let unparen = parse(
+            &diag,
+            &dendro_lexer::parse(
+                "
+            iter.map \\x -> x + 1
+                .take 3
+                .collect (Vec i32)",
+                &diag,
+            ),
+        )
+        .unwrap();
+
+        let paren = parse(
+            &diag,
+            &dendro_lexer::parse(
+                "
+            ((iter.map (\\x -> x + 1))
+                .take 3)
+                .collect (Vec i32)",
+                &diag,
+            ),
+        )
+        .unwrap();
+
+        println!("{unparen:?}\n{paren:?}");
+    }
 }

@@ -33,6 +33,8 @@ pub enum TokenKind {
     BinOp(BinOpToken),
     BinOpEq(BinOpToken),
 
+    PlusPlus,
+
     // Structural symbols
     /// `@`
     At,
@@ -198,6 +200,7 @@ impl Token {
                 Eq => BinOpEq(op),
                 BinOp(And) if op == And => AndAnd,
                 BinOp(Or) if op == Or => OrOr,
+                BinOp(Plus) if op == Plus => PlusPlus,
                 Gt if op == Minus => RArrow,
                 _ => return None,
             },
@@ -221,10 +224,12 @@ impl Token {
                 _ => return None,
             },
 
-            Le | EqEq | Ne | Ge | AndAnd | BackSlash | OrOr | Tilde | BinOpEq(..) | BackQuote
-            | At | DotDotDot | DotDotEq | Comma | Semi | ColonColon | ColonEq | RArrow | LArrow
-            | FatArrow | Pound | Dollar | Question | OpenDelim(..) | CloseDelim(..)
-            | Literal(..) | Ident(..) | Lifetime(..) | DocComment(..) => return None,
+            Le | EqEq | Ne | Ge | AndAnd | BackSlash | OrOr | PlusPlus | Tilde | BinOpEq(..)
+            | BackQuote | At | DotDotDot | DotDotEq | Comma | Semi | ColonColon | ColonEq
+            | RArrow | LArrow | FatArrow | Pound | Dollar | Question | OpenDelim(..)
+            | CloseDelim(..) | Literal(..) | Ident(..) | Lifetime(..) | DocComment(..) => {
+                return None
+            }
         };
 
         Some(Token::new(kind, self.span.to(&joint.span)))
