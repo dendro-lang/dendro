@@ -32,7 +32,6 @@ extern {
         ">" => (_, T(token::Gt), _),
         "&&" => (_, T(token::AndAnd), _),
         "||" => (_, T(token::OrOr), _),
-        "++" => (_, T(token::PlusPlus), _),
         "!" => (_, T(token::Not), _),
         "~" => (_, T(token::Tilde), _),
         "`" => (_, T(token::BackQuote), _),
@@ -66,11 +65,8 @@ extern {
         "`.." => (Spacing::Joint, T(token::DotDot), Spacing::Alone),
         "..`" => (Spacing::Alone, T(token::DotDot), Spacing::Joint),
         "`..`" => (Spacing::Joint, T(token::DotDot), Spacing::Joint),
-        "..." => (_, T(token::DotDotDot), _),
-        "..=" => (Spacing::Alone, T(token::DotDotEq), Spacing::Alone),
-        "`..=" => (Spacing::Joint, T(token::DotDotEq), Spacing::Alone),
-        "..=`" => (Spacing::Alone, T(token::DotDotEq), Spacing::Joint),
-        "`..=`" => (Spacing::Joint, T(token::DotDotEq), Spacing::Joint),
+        "..=" => (Spacing::Alone, T(token::DotDotEq), _),
+        "`..=" => (Spacing::Joint, T(token::DotDotEq), _),
         "," => (_, T(token::Comma), _),
         ";" => (_, T(token::Semi), _),
         ":" => (_, T(token::Colon), _),
@@ -164,21 +160,12 @@ InnerAttr: () = {
     }),
 }
 
-RangeLimits: RangeLimits = {
-    ".." => RangeLimits::HalfOpen,
-    "..=" => RangeLimits::Closed,
-}
-
-#[inline]
-Range<T>: (Option<T>, RangeLimits, Option<T>, Span) = {
-}
-
 #[inline]
 RangeTo<T>: (RangeLimits, T, Span) = {
     <lo:@L> "..`" <rhs:T> <hi:@R> => {
         (RangeLimits::HalfOpen, rhs, Span::new(lo, hi))
     },
-    <lo:@L> "..=`" <rhs:T> <hi:@R> => {
+    <lo:@L> "..=" <rhs:T> <hi:@R> => {
         (RangeLimits::Closed, rhs, Span::new(lo, hi))
     },
 }
@@ -679,7 +666,7 @@ ExprBinary: P<Expr> = {
         expr::parse_bin(lhs, (op.0, BinOpKind::Or, op.2), rhs),
 
     #[precedence(level = "8")] #[assoc(side = "left")]
-    <lo:@L> <lhs:ExprBinary> "`..=`" <rhs:ExprBinary> <hi:@R> => P(Expr {
+    <lo:@L> <lhs:ExprBinary> "`..=" <rhs:ExprBinary> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Range(Some(lhs), RangeLimits::Closed, Some(rhs)),
         span: Span::new(lo, hi),
@@ -1079,7 +1066,7 @@ PatOp: P<Pat> = {
     PatPath,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <lo:@L> <lhs:PatOp> "`..=`" <rhs:PatOp> <hi:@R> => P(Pat {
+    <lo:@L> <lhs:PatOp> "`..=" <rhs:PatOp> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(Some(lhs), RangeLimits::Closed, Some(rhs)),
         span: Span::new(lo, hi),
