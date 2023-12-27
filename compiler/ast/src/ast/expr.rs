@@ -263,6 +263,8 @@ pub enum ExprKind {
     Exists(P<Expr>),
     /// `a: b`,
     BelongsTo(P<Expr>, P<Expr>),
+    /// (expr)
+    Paren(P<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

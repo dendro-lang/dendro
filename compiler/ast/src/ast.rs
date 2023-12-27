@@ -26,13 +26,21 @@ impl<T> Spanned<T> {
     pub fn new(kind: T, span: Span) -> Self {
         Spanned { kind, span }
     }
+
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Spanned<U> {
+        Spanned {
+            kind: f(self.kind),
+            span: self.span,
+        }
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum VisibilityKind {
     /// `pub`
     Public,
     /// Inherited
+    #[default]
     Inherited,
     /// `pub(in expr)`
     Restricted { path: P<Expr>, id: u32 },
@@ -44,8 +52,7 @@ pub type Visibility = Spanned<VisibilityKind>;
 pub enum PathRoot {
     Leaf,
     Super,
-    /// `self`
-    This,
+    Module,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

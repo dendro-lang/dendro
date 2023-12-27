@@ -55,7 +55,7 @@ keywords![
     DO: "do",
     WITH: "with",
     SUPER: "super",
-    SELF: "self",
+    MOD: "mod",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

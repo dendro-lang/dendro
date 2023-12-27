@@ -6,7 +6,6 @@ lalrpop_mod!(
     "/src/ast.rs"
 );
 
-mod expr;
 mod ident;
 mod macros;
 mod pat;
@@ -14,7 +13,7 @@ mod pat;
 use std::mem;
 
 use dendro_ast::{
-    ast::{Attribute, Leaf, Stmt, Visibility, VisibilityKind, DUMMY_ID, P},
+    ast::{Attribute, Leaf, Stmt, DUMMY_ID, P},
     token::{Delimiter, Token, TokenKind},
     token_stream::{CursorRef, Spacing, TokenStream, TokenTree},
 };
@@ -154,13 +153,6 @@ impl<'a, 'diag> Iterator for Iter<'a, 'diag> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next_token()
-    }
-}
-
-fn parse_vis(input: (Pos, VisibilityKind, Pos)) -> Visibility {
-    Visibility {
-        kind: input.1,
-        span: Span::new(input.0, input.2),
     }
 }
 

@@ -1,7 +1,7 @@
 use std::{
     fmt::{self, Debug, Display},
     hash::Hash,
-    ops::{Deref, DerefMut},
+    ops::Deref,
     slice, vec,
 };
 
@@ -58,12 +58,6 @@ impl<T: ?Sized> Deref for P<T> {
 
     fn deref(&self) -> &T {
         &self.ptr
-    }
-}
-
-impl<T: ?Sized> DerefMut for P<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        &mut self.ptr
     }
 }
 
