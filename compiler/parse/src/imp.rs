@@ -195,9 +195,9 @@ mod tests {
         let diag = DiagCx::new();
         let tts = dendro_lexer::parse(
             "
-            forall r where r: u32 ::
+            forall r where r: u32 =>
             #[allow(unused)]
-            pub unsafe let a r := r;",
+            pub let a r := r;",
             &diag,
         );
 
@@ -211,14 +211,14 @@ mod tests {
         let diag = DiagCx::new();
         let tts = dendro_lexer::parse(
             "
-            forall t, a, b, c where a: t, b: t, c: t ::
+            forall t, a, b, c where a: t, b: t, c: t =>
             pub let delta a b c := (b.pow 2) - ((*) 4 a) * c;",
             &diag,
         );
 
         let ts = parse(&diag, &tts).unwrap();
 
-        println!("{:#?}", ts);
+        println!("{:?}", ts);
     }
 
     #[test]
@@ -228,26 +228,14 @@ mod tests {
             &diag,
             &dendro_lexer::parse(
                 "
-            iter.map \\x -> x + 1
-                .take 3
-                .collect (Vec i32)",
+            iter.(map (\\x -> x + 1))
+                .(take 3)
+                .(collect ?(Vec i32))",
                 &diag,
             ),
         )
         .unwrap();
 
-        let paren = parse(
-            &diag,
-            &dendro_lexer::parse(
-                "
-            ((iter.map (\\x -> x + 1))
-                .take 3)
-                .collect (Vec i32)",
-                &diag,
-            ),
-        )
-        .unwrap();
-
-        println!("{unparen:?}\n{paren:?}");
+        println!("{unparen:?}");
     }
 }

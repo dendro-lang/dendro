@@ -114,19 +114,27 @@ impl Prerequisites {
 /// `let x a := a`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Let {
-    pub is_unsafe: bool,
     pub pat: P<Pat>,
     pub ty: Option<P<Expr>>,
     pub expr: P<Expr>,
 }
 
-/// `pat => expr`
+/// `\pat: ty`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EnumField {
+    pub prerequisites: Prerequisites,
+    pub attrs: Vec<Attribute>,
+    pub id: u32,
+    pub pat: P<Pat>,
+    pub ty: Option<P<Expr>>,
+}
+
+/// `\pat -> expr`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MatchArm {
     pub prerequisites: Prerequisites,
     pub attrs: Vec<Attribute>,
     pub pat: P<Pat>,
-    pub guard: Option<P<Expr>>,
     pub expr: P<Expr>,
 }
 
@@ -175,7 +183,6 @@ pub enum BlockKind {
 pub struct Block {
     pub id: u32,
     pub kind: BlockKind,
-    pub is_unsafe: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -222,11 +229,11 @@ pub enum ExprKind {
     Tuple(Vec<P<Expr>>),
     /// `\{ x: a, y: b }`
     Struct(Vec<StructField>, StructRest),
-    /// `Some x ++ None`
-    Enum(Vec<P<Expr>>),
+    /// `\[ Some a, None ]`
+    Enum(Vec<EnumField>),
     /// `'life: expr`
     Annotated(Lifetime, P<Expr>),
-    /// `{ expr }` or `unsafe { expr }`
+    /// `{ expr }`
     Block(P<Block>),
     /// `\param: type -> body`
     Lambda(P<Pat>, Option<P<Expr>>, P<Expr>),
@@ -249,7 +256,7 @@ pub enum ExprKind {
     /// `return value`
     Return(Option<P<Expr>>),
     /// `caller callee`
-    Call(P<Expr>, P<Expr>),
+    Call(P<Expr>, P<Expr>, /** is_implicit */ bool),
     /// `try expr`.
     Try(P<Expr>),
     /// `exists expr`.

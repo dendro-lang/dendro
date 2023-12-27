@@ -66,8 +66,7 @@ extern {
         ">>=" => (_, T(token::BinOpEq(token::Shr)), _),
 
         "@" => (_, T(token::At), _),
-        "." => (Spacing::Alone, T(token::Dot), _),
-        "`." => (Spacing::Joint, T(token::Dot), _),
+        "." => (_, T(token::Dot), _),
         ".." => (Spacing::Alone, T(token::DotDot), Spacing::Alone),
         "`.." => (Spacing::Joint, T(token::DotDot), Spacing::Alone),
         "..`" => (Spacing::Alone, T(token::DotDot), Spacing::Joint),
@@ -80,8 +79,7 @@ extern {
         "," => (_, T(token::Comma), _),
         ";" => (_, T(token::Semi), _),
         ":" => (_, T(token::Colon), _),
-        "::" => (Spacing::Alone, T(token::ColonColon), Spacing::Alone),
-        "`::`" => (Spacing::Joint, T(token::ColonColon), Spacing::Joint),
+        "::" => (_, T(token::ColonColon), _),
         ":=" => (_, T(token::ColonEq), _),
         "->" => (_, T(token::RArrow), _),
         "<-" => (_, T(token::LArrow), _),
@@ -98,7 +96,6 @@ extern {
         "KW:let" => (_, T(token::Ident(kw::LET, false)), _),
         "KW:pub" => (_, T(token::Ident(kw::PUB, false)), _),
         "KW:static" => (_, T(token::Ident(kw::STATIC, false)), _),
-        "KW:unsafe" => (_, T(token::Ident(kw::UNSAFE, false)), _),
         "KW:default" => (_, T(token::Ident(kw::DEFAULT, false)), _),
         "KW:const" => (_, T(token::Ident(kw::CONST, false)), _),
         "KW:mut" => (_, T(token::Ident(kw::MUT, false)), _),
@@ -281,7 +278,7 @@ Where: Vec<P<Expr>> = {
 Prerequisites: Prerequisites = {
     <lo:@L>
         "KW:forall" <first:Ident> <next:("," Ident)*>
-        <w:Where?> "::"
+        <w:Where?> "=>"
     <hi:@R> => {
         Prerequisites {
             id: DUMMY_ID,
@@ -437,13 +434,43 @@ ExprStruct: P<Expr> = {
     }),
 }
 
+EnumField: EnumField = {
+    <prereq:(@L Prerequisites? @R)>
+    <attrs:Attrs>
+    <pat:PatOp> <ty:(":" Expr)?> => EnumField {
+        prerequisites: prereq.1.unwrap_or_else(|| {
+            Prerequisites::from_span(Span::new(prereq.0, prereq.2))
+        }),
+        attrs: cx.take_attr(attrs),
+        id: DUMMY_ID,
+        pat,
+        ty: ty.map(|t| t.1),
+    },
+}
+
+ExprEnum: P<Expr> = {
+    <lo:@L>  "\\`" "["
+        <first:EnumField>
+        <next:("," EnumField)*> ","?
+    "]" <hi:@R> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Enum(
+            [first]
+                .into_iter()
+                .chain(next.into_iter().map(|(_, f)| f))
+                .collect(),
+        ),
+        span: Span::new(lo, hi),
+        attrs: cx.take_attr(vec![]),
+    }),
+}
+
 ExprUnloadedBlock: P<Expr> = {
     <lo:@L> "`" <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Block(P(Block {
             id: DUMMY_ID,
             kind: BlockKind::Unloaded,
-            is_unsafe: false,
         })),
         span: Span::new(lo, hi),
         attrs: cx.take_attr(vec![]),
@@ -451,7 +478,7 @@ ExprUnloadedBlock: P<Expr> = {
 }
 
 ExprBlock: P<Block> = {
-    <is_unsafe:"KW:unsafe"?> "{" <lo:@L>
+    "{" <lo:@L>
         InnerAttr*
         <mut stmts:Stmt*>
         <last:StmtSemi?>
@@ -465,7 +492,6 @@ ExprBlock: P<Block> = {
             is_inline: false,
             span: Span::new(lo, hi),
         },
-        is_unsafe: is_unsafe.is_some(),
     }),
 }
 
@@ -519,8 +545,8 @@ pub ExprPath: P<Expr> = {
     ExprAtomic,
 
     <lo:@L>
-        <root:PathRoot> "`::`"
-        <e:(ExprAtomic "`::`")*>
+        <root:PathRoot> "::"
+        <e:(ExprAtomic "::")*>
         <last:ExprAtomic>
     <hi:@R> => P(Expr {
         id: DUMMY_ID,
@@ -545,6 +571,7 @@ ExprNonArray: P<Expr> = {
     ExprPath,
     ExprTuple,
     ExprStruct,
+    ExprEnum,
 }
 
 ExprDelimited: P<Expr> = {
@@ -560,11 +587,22 @@ ExprDelimited: P<Expr> = {
     }),
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <e:ExprDelimited> <op:(@L "`." @R)> <func:ExprPath> => {
+    <e:ExprDelimited> <op:(@L "." @R)> <func:ExprPath> => {
         let span = Span::new(e.span.start, func.span.end);
         P(Expr {
             id: DUMMY_ID,
             kind: ExprKind::InfixCall(e, Span::new(op.0, op.2), func),
+            span,
+            attrs: cx.take_attr(vec![]),
+        })
+    },
+
+    #[precedence(level = "2")] #[assoc(side = "left")]
+    <func:ExprDelimited> <is_implicit:"?"?> <arg:ExprDelimited> => {
+        let span = Span::new(func.span.start, arg.span.end);
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::Call(func, arg, is_implicit.is_some()),
             span,
             attrs: cx.take_attr(vec![]),
         })
@@ -677,13 +715,12 @@ ExprBinary: P<Expr> = {
 MatchArm: MatchArm = {
     <lo:@L> <prereq:Prerequisites?> <hi:@R>
     <attrs:Attrs>
-    <pat:Pat> <guard:("KW:if" Expr)?> "=>" <expr:Expr> => MatchArm {
+    "\\" <pat:Pat> "->" <expr:Expr> => MatchArm {
         prerequisites: prereq.unwrap_or_else(|| {
             Prerequisites::from_span(Span::new(lo, hi))
         }),
         attrs: cx.take_attr(attrs),
         pat,
-        guard: guard.map(|(_, expr)| expr),
         expr,
     }
 }
@@ -698,52 +735,7 @@ ExprUnannotated: P<Expr> = {
     #[precedence(level = "0")]
     ExprBinary,
 
-    <lo:@L> "\\" <arg:PatOp> <ty:(":" Expr)?> "->" <body:(ExprBinary @R)> => P(Expr {
-        id: DUMMY_ID,
-        kind: ExprKind::Lambda(arg, ty.map(|ty| ty.1), body.0),
-        span: Span::new(lo, body.1),
-        attrs: cx.take_attr(vec![]),
-    }),
-
-    #[precedence(level = "1")] #[assoc(side = "left")]
-
-    <func:ExprUnannotated> <arg:ExprUnannotated> => {
-        let span = Span::new(func.span.start, arg.span.end);
-        P(Expr {
-            id: DUMMY_ID,
-            kind: ExprKind::Call(func, arg),
-            span,
-            attrs: cx.take_attr(vec![]),
-        })
-    },
-
-    <e:ExprUnannotated> <op:(@L "." @R)> <func:ExprPath> => {
-        let span = Span::new(e.span.start, func.span.end);
-        P(Expr {
-            id: DUMMY_ID,
-            kind: ExprKind::InfixCall(e, Span::new(op.0, op.2), func),
-            span,
-            attrs: cx.take_attr(vec![]),
-        })
-    },
-
-    #[precedence(level = "2")] #[assoc(side = "left")]
-    <mut lhs:ExprUnannotated> "++" <rhs:ExprUnannotated> => match &mut lhs.kind {
-        ExprKind::Enum(e) => {
-            let end = rhs.span.end;
-            e.push(rhs);
-            lhs.span.end = end;
-            lhs
-        }
-        _ => P(Expr {
-            id: DUMMY_ID,
-            span: Span::new(lhs.span.start, rhs.span.end),
-            kind: ExprKind::Enum(vec![lhs, rhs]),
-            attrs: cx.take_attr(vec![]),
-        })
-    },
-
-    #[precedence(level = "3")] #[assoc(side = "right")]
+    #[precedence(level = "1")] #[assoc(side = "right")]
 
     <lo:@L> <lhs:ExprDelimited> <op:(@L "=" @R)> <rhs:Expr> <hi:@R> => {
         P(Expr {
@@ -763,6 +755,13 @@ ExprUnannotated: P<Expr> = {
         })
     },
 
+    <lo:@L> "\\" <arg:PatOp> <ty:(":" Expr)?> "->" <body:(Expr @R)> => P(Expr {
+        id: DUMMY_ID,
+        kind: ExprKind::Lambda(arg, ty.map(|ty| ty.1), body.0),
+        span: Span::new(lo, body.1),
+        attrs: cx.take_attr(vec![]),
+    }),
+
     <lo:@L> <lhs:ExprDelimited> ":" <rhs:Expr> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::BelongsTo(lhs, rhs),
@@ -770,16 +769,15 @@ ExprUnannotated: P<Expr> = {
         attrs: cx.take_attr(vec![]),
     }),
 
-    #[precedence(level = "4")]
+    #[precedence(level = "2")]
 
     <lo:@L>
-        <is_unsafe:"KW:unsafe"?> "KW:let" <pat:PatOp>
+        "KW:let" <pat:PatOp>
         <ty:(":" Expr)?>
         ":=" <expr:LetExpr>
     <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Let(Let {
-            is_unsafe: is_unsafe.is_some(),
             pat,
             ty: ty.map(|(_, ty)| ty),
             expr,
@@ -1054,8 +1052,8 @@ PatAtomic: P<Pat> = {
 
 PatPath: P<Pat> = {
     <lo:@L>
-        <root:PathRoot> "`::`"
-        <e:(PatAtomic "`::`")*>
+        <root:PathRoot> "::"
+        <e:(PatAtomic "::")*>
         <last:PatAtomic>
     <hi:@R> => P(Pat {
         id: DUMMY_ID,
@@ -1121,9 +1119,9 @@ PatOp: P<Pat> = {
     }),
 
     #[precedence(level = "5")] #[assoc(side = "left")]
-    <lo:@L> <func:PatOp> <arg:PatOp> <hi:@R> => P(Pat {
+    <lo:@L> <func:PatOp> <is_implicit:"?"?> <arg:PatOp> <hi:@R> => P(Pat {
         id: DUMMY_ID,
-        kind: PatKind::Call(func, arg),
+        kind: PatKind::Call(func, arg, is_implicit.is_some()),
         span: Span::new(lo, hi),
     }),
 }

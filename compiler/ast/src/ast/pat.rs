@@ -45,7 +45,7 @@ pub enum PatKind {
     /// `(pat)`
     Paren(P<Pat>),
     /// `func arg`
-    Call(P<Pat>, P<Pat>),
+    Call(P<Pat>, P<Pat>, /** is_implicit */ bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -34,7 +34,6 @@ keywords![
     LET: "let",
     PUB: "pub",
     STATIC: "static",
-    UNSAFE: "unsafe",
     DEFAULT: "default",
     CONST: "const",
     MUT: "mut",
