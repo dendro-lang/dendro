@@ -13,7 +13,7 @@ mod pat;
 use std::mem;
 
 use dendro_ast::{
-    ast::{Attribute, Leaf, Stmt, DUMMY_ID, P},
+    ast::{Attribute, Leaf},
     token::{Delimiter, Token, TokenKind},
     token_stream::{CursorRef, Spacing, TokenStream, TokenTree},
 };
@@ -143,6 +143,10 @@ impl ParseCx {
     fn push_attr(&mut self, attr: Attribute) {
         self.inner_attrs.push(attr);
     }
+
+    fn extend_attr(&mut self, iter: impl IntoIterator<Item = Attribute>) {
+        self.inner_attrs.extend(iter);
+    }
 }
 
 #[derive(Debug)]
@@ -159,13 +163,7 @@ impl<'a, 'diag> Iterator for Iter<'a, 'diag> {
 pub fn parse<'diag>(diag: &'diag DiagCx, input: &TokenStream) -> Result<Leaf, ParseError<'diag>> {
     let tf = TokenFrames::new(diag, input.trees());
     let mut cx = ParseCx::default();
-    let stmts: Vec<P<Stmt>> = ast::StmtsParser::new().parse(diag, &mut cx, tf)?;
-    Ok(Leaf {
-        id: DUMMY_ID,
-        attrs: cx.inner_attrs,
-        stmts,
-        span: Span::new(Pos(0), Pos(1)),
-    })
+    ast::LeafParser::new().parse(diag, &mut cx, tf)
 }
 
 #[cfg(test)]

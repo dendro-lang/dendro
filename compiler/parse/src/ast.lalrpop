@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, mem};
 
 use dendro_ast::{ast::*, token, token_stream::*};
 use dendro_span::{span::*, symbol::*, ident::*};
@@ -388,20 +388,14 @@ ExprEnum: ExprKind = {
 }
 
 ExprUnloadedBlock: ExprKind = {
-    "`" => ExprKind::Block(P(Block {
-        id: DUMMY_ID,
-        kind: BlockKind::Unloaded,
-    })),
+    "`" => ExprKind::Block(P(Block::unloaded())),
 }
 
 ExprBlock: ExprKind = {
-    "{" <lo:@L> InnerAttr* <stmts:Stmts> <hi:@R> "}" => ExprKind::Block(P(Block {
-        id: DUMMY_ID,
-        kind: BlockKind::Loaded {
-            stmts,
-            is_inline: false,
-            span: Span::new(lo, hi),
-        },
+    "{" <leaf:Leaf> "}" => ExprKind::Block(P({
+        let (block, attr) = leaf.load_block(Block::unloaded());
+        cx.extend_attr(attr);
+        block
     })),
 }
 
@@ -802,9 +796,21 @@ StmtSemi: P<Stmt> = {
     }),
 }
 
-pub Stmts: Vec<P<Stmt>> = {
+Stmts: Vec<P<Stmt>> = {
     <mut stmts:Stmt*> <fin:StmtSemi?> => {
         stmts.extend(fin);
         stmts
+    },
+}
+
+// ------------------------------------------
+// Leaf
+
+pub Leaf: Leaf = {
+    <lo:@L> InnerAttr* <stmts:Stmts> <hi:@R> => Leaf {
+        id: DUMMY_ID,
+        attrs: mem::take(&mut cx.inner_attrs),
+        stmts,
+        span: Span::new(lo, hi),
     },
 }

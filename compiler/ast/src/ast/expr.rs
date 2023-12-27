@@ -185,6 +185,15 @@ pub struct Block {
     pub kind: BlockKind,
 }
 
+impl Block {
+    pub const fn unloaded() -> Self {
+        Block {
+            id: DUMMY_ID,
+            kind: BlockKind::Unloaded,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExprKind {
     /// `ident`
