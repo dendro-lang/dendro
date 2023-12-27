@@ -265,13 +265,13 @@ Spanned<T>: Spanned<T> = {
 // Identifiers
 
 Ident: Ident = {
-    <lo:@L> <ident:"ident"> <hi:@R> => Ident::new(ident, Span::new(lo, hi)),
+    <sp:Spanned<"ident">> => Ident::new(sp.kind, sp.span),
 }
 
 Lifetime: Lifetime = {
-    <lo:@L> <lifetime:"lifetime"> <hi:@R> => Lifetime {
+    <sp:Spanned<"lifetime">> => Lifetime {
         id: DUMMY_ID,
-        ident: Ident::new(lifetime, Span::new(lo, hi)),
+        ident: Ident::new(sp.kind, sp.span),
     },
 }
 
@@ -317,10 +317,10 @@ UnOp: UnOp = Spanned<UnOpKind>;
 
 #[inline]
 ExprOf<T>: P<Expr> = {
-    <lo:@L> <kind:T> <hi:@R> => P(Expr {
+    <sp:Spanned<T>> => P(Expr {
         id: DUMMY_ID,
-        kind,
-        span: Span::new(lo, hi),
+        kind: sp.kind,
+        span: sp.span,
         attrs: cx.take_attr(vec![]),
     }),
 }
@@ -433,8 +433,8 @@ ExprDelimited: ExprKind = {
     <e:ExprOf<ExprDelimited>> "`[" <index:Expr> "]" => ExprKind::Index(e, index),
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <e:ExprOf<ExprDelimited>> <op:(@L "." @R)> <func:ExprPath> =>
-        ExprKind::InfixCall(e, Span::new(op.0, op.2), func),
+    <e:ExprOf<ExprDelimited>> <op:Spanned<".">> <func:ExprPath> =>
+        ExprKind::InfixCall(e, op.span, func),
 
     #[precedence(level = "2")] #[assoc(side = "left")]
     <func:ExprOf<ExprDelimited>> <is_implicit:"?"?> <arg:ExprOf<ExprDelimited>> =>
@@ -539,8 +539,8 @@ ExprUnannotated: ExprKind = {
 
     #[precedence(level = "1")] #[assoc(side = "right")]
 
-    <lhs:ExprOf<ExprDelimited>> <op:(@L "=" @R)> <rhs:Expr> =>
-        ExprKind::Assign(lhs, Span::new(op.0, op.2), rhs),
+    <lhs:ExprOf<ExprDelimited>> <op:Spanned<"=">> <rhs:Expr> =>
+        ExprKind::Assign(lhs, op.span, rhs),
 
     <lhs:ExprOf<ExprDelimited>> <op:AssignOp> <rhs:Expr> =>
         ExprKind::AssignOp(lhs, op, rhs),
