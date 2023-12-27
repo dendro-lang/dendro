@@ -111,7 +111,7 @@ extern {
         "KW:mod" => (_, T(token::Ident(kw::MOD, false)), _),
 
         "literal" => (_, T(token::Literal(<token::Lit>)), _),
-        "ident" => (_, T(token::Ident(<Symbol>, <bool>)), _),
+        "ident" => (_, T(token::Ident(<Symbol>, _)), _),
         "lifetime" => (_, T(token::Lifetime(<Symbol>)), _),
         "inner attr" => (_, InnerAttr(<PResult<'diag, Attribute>>), _),
         "outer attr" => (_, OuterAttr(<PResult<'diag, Attribute>>), _),
@@ -265,8 +265,7 @@ Spanned<T>: Spanned<T> = {
 // Identifiers
 
 Ident: Ident = {
-    <lo:@L> <ident:"ident"> <hi:@R> =>? 
-        ident::parse_ident(diag, Span::new(lo, hi), ident),
+    <lo:@L> <ident:"ident"> <hi:@R> => Ident::new(ident, Span::new(lo, hi)),
 }
 
 Lifetime: Lifetime = {
@@ -638,7 +637,11 @@ PatField: PatField = {
     <hi:@R> => PatField {
         id: DUMMY_ID,
         ident,
-        pat: pat::parse_ident(Span::new(lo, hi), mode, m, ident),
+        pat: P(Pat {
+            id: DUMMY_ID,
+            kind: PatKind::Ident(mode, m, ident, None),
+            span: Span::new(lo, hi),
+        }),
         span: Span::new(lo, hi),
         is_shorthand: false,
         is_placeholder: false,
@@ -680,7 +683,7 @@ PatAtomic: P<Pat> = {
         kind: PatKind::Wildcard,
         span: Span::new(lo, hi)
     }),
-    
+
     <lo:@L> ".." <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(None, RangeLimits::HalfOpen, None),

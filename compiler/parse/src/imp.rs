@@ -6,9 +6,7 @@ lalrpop_mod!(
     "/src/ast.rs"
 );
 
-mod ident;
 mod macros;
-mod pat;
 
 use std::mem;
 

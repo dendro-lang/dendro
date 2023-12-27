@@ -213,7 +213,7 @@ impl Token {
                 _ => return None,
             },
             SingleQuote => match joint.kind {
-                Ident(name, false) => Lifetime(name),
+                Ident(name, false) => Lifetime(Symbol::new(&format!("'{name}"))),
                 _ => return None,
             },
 
