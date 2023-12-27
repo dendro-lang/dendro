@@ -361,7 +361,7 @@ StructRest: StructRest = {
 }
 
 ExprStruct: ExprKind = {
-    "`" "{" <fields:Comma<StructField>> "}" <hi:@R> => 
+    "`" "{" <fields:Comma<StructField>> "}" => 
         ExprKind::Struct(fields, StructRest::None),
 
     "`" "{" <fields:(<StructField> ",")*> <rest:StructRest> "}" =>
@@ -573,11 +573,11 @@ ExprUnannotated: ExprKind = {
 
     "KW:exists" <e:ExprOf<ExprUnannotated>> => ExprKind::Exists(e),
 
-    "KW:break" <l:Lifetime?> <e:ExprOf<ExprUnannotated>?> <hi:@R> => ExprKind::Break(l, e),
+    "KW:break" <l:Lifetime?> <e:ExprOf<ExprUnannotated>?> => ExprKind::Break(l, e),
 
-    "KW:continue" <l:Lifetime?> <hi:@R> => ExprKind::Continue(l),
+    "KW:continue" <l:Lifetime?> => ExprKind::Continue(l),
 
-    "KW:return" <e:ExprOf<ExprUnannotated>?> <hi:@R> => ExprKind::Return(e),
+    "KW:return" <e:ExprOf<ExprUnannotated>?> => ExprKind::Return(e),
 }
 
 ExprKind: ExprKind = {
