@@ -227,9 +227,9 @@ pub enum ExprKind {
     ArrayRepeated(P<Expr>, P<Expr>),
     /// `(a, b, c)`
     Tuple(Vec<P<Expr>>),
-    /// `\{ x: a, y: b }`
+    /// \``{ x: a, y: b }`
     Struct(Vec<StructField>, StructRest),
-    /// `\[ Some a, None ]`
+    /// \``[ Some a, None ]`
     Enum(Vec<EnumField>),
     /// `'life: expr`
     Annotated(Lifetime, P<Expr>),

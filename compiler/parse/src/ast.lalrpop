@@ -18,7 +18,7 @@ extern {
         "(" => (_, T(token::OpenDelim(token::Parenthesis)), _),
         ")" => (_, T(token::CloseDelim(token::Parenthesis)), _),
         "`[" => (Spacing::Joint, T(token::OpenDelim(token::Bracket)), _),
-        "[" => (_, T(token::OpenDelim(token::Bracket)), _),
+        "[" => (Spacing::Alone, T(token::OpenDelim(token::Bracket)), _),
         "]" => (_, T(token::CloseDelim(token::Bracket)), _),
         "{" => (_, T(token::OpenDelim(token::Brace)), _),
         "}" => (_, T(token::CloseDelim(token::Brace)), _),
@@ -36,12 +36,7 @@ extern {
         "!" => (_, T(token::Not), _),
         "~" => (_, T(token::Tilde), _),
         "`" => (_, T(token::BackQuote), _),
-        "\\`" => (_, T(token::BackSlash), Spacing::Joint),
         "\\" => (_, T(token::BackSlash), _),
-
-        "-`" => (_, T(token::BinOp(token::Minus)), Spacing::Joint),
-        "*`" => (_, T(token::BinOp(token::Star)), Spacing::Joint),
-        "&`" => (_, T(token::BinOp(token::And)), Spacing::Joint),
 
         "+" => (_, T(token::BinOp(token::Plus)), _),
         "-" => (_, T(token::BinOp(token::Minus)), _),
@@ -290,9 +285,9 @@ Prerequisites: Prerequisites = {
 }
 
 UnOpKind: UnOpKind = {
-    "*`" => UnOpKind::Deref,
+    "*" => UnOpKind::Deref,
     "!" => UnOpKind::Not,
-    "-`" => UnOpKind::Neg,
+    "-" => UnOpKind::Neg,
 }
 
 UnOp: UnOp = {
@@ -394,14 +389,14 @@ StructRest: StructRest = {
 }
 
 ExprStruct: P<Expr> = {
-    <lo:@L> "\\`" "{" <rest:StructRest?> "}" <hi:@R> => P(Expr {
+    <lo:@L> "`" "{" <rest:StructRest?> "}" <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::Struct(vec![], rest.unwrap_or_default()),
         span: Span::new(lo, hi),
         attrs: cx.take_attr(vec![]),
     }),
 
-    <lo:@L>  "\\`" "{"
+    <lo:@L>  "`" "{"
         <first:StructField>
         <next:("," StructField)*> ","?
     "}" <hi:@R> => P(Expr {
@@ -417,7 +412,7 @@ ExprStruct: P<Expr> = {
         attrs: cx.take_attr(vec![]),
     }),
 
-    <lo:@L>  "\\`" "{"
+    <lo:@L>  "`" "{"
         <first:StructField>
         <next:("," StructField)*> "," <rest:StructRest>
     "}" <hi:@R> => P(Expr {
@@ -449,7 +444,7 @@ EnumField: EnumField = {
 }
 
 ExprEnum: P<Expr> = {
-    <lo:@L>  "\\`" "["
+    <lo:@L>  "`" "["
         <first:EnumField>
         <next:("," EnumField)*> ","?
     "]" <hi:@R> => P(Expr {
@@ -621,7 +616,7 @@ ExprUnary: P<Expr> = {
         })
     },
 
-    <lo:@L> "&`" <l:Lifetime?> <m:Mutability> <e:ExprUnary> <hi:@R> => P(Expr {
+    <lo:@L> "&" <l:Lifetime?> <m:Mutability> <e:ExprUnary> <hi:@R> => P(Expr {
         id: DUMMY_ID,
         kind: ExprKind::AddrOf(l, m, e),
         span: Span::new(lo, hi),
@@ -941,14 +936,20 @@ PatTuple: P<Pat> = {
     }),
 }
 
+#[inline]
+PatArrayStart: () = {
+    "[" => (),
+    "`[" => (),
+}
+
 PatArray: P<Pat> = {
-    <lo:@L> "[" "]" <hi:@R> => P(Pat {
+    <lo:@L> PatArrayStart "]" <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Array(vec![]),
         span: Span::new(lo, hi),
     }),
 
-    <lo:@L> "[" <first:PatOp> <next:("," PatOp)*> ","? "]" <hi:@R> => P(Pat {
+    <lo:@L> PatArrayStart <first:PatOp> <next:("," PatOp)*> ","? "]" <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Array(
             [first]
@@ -983,13 +984,13 @@ PatField: PatField = {
 }
 
 PatStruct: P<Pat> = {
-    <lo:@L> "\\`" "{" <recover:".."?> "}" <hi:@R> => P(Pat {
+    <lo:@L> "{" <recover:".."?> "}" <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Struct(vec![], recover.is_some()),
         span: Span::new(lo, hi),
     }),
 
-    <lo:@L> "\\`" "{"
+    <lo:@L> "{"
         <first:PatField>
         <fields:("," PatField)*> ","?
     "}" <hi:@R> => P(Pat {
@@ -1004,7 +1005,7 @@ PatStruct: P<Pat> = {
         span: Span::new(lo, hi),
     }),
 
-    <lo:@L> "\\`" "{"
+    <lo:@L> "{"
         <first:PatField>
         <fields:("," PatField)*> "," ".."
     "}" <hi:@R> => P(Pat {
@@ -1102,7 +1103,7 @@ PatOp: P<Pat> = {
     }),
 
     #[precedence(level = "3")]
-    <lo:@L> "&`" <l:Lifetime?> <m:Mutability> <i:PatOp> <hi:@R> => P(Pat {
+    <lo:@L> "&" <l:Lifetime?> <m:Mutability> <i:PatOp> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Deref(l, m, i),
         span: Span::new(lo, hi),
