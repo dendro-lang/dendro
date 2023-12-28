@@ -8,6 +8,27 @@
 - Pure functional programming subset
 - Full compile-time evaluation support
 
+## Example
+
+```dendro
+#[alias]
+let { * } := `{
+    ..std::ops::{ Add },
+};
+
+let MyInt := u32;
+
+let add: Add MyInt MyInt := Add `{
+    output: MyInt,
+
+    forall a, b where a: MyInt, b: MyInt =>
+    (+) (MyInt a) (MyInt b): a + b,
+};
+
+let a := MyInt 1;
+std::io::println "Hello, {}" (a + (MyInt 2))
+```
+
 ## Current Stage
 
 This programming language is currently in the prototype design stage. See [the grammar](compiler/parse/src/ast.lalrpop) for more information.

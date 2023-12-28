@@ -337,8 +337,7 @@ ExprArray: ExprKind = {
 }
 
 StructFieldKind: StructFieldKind = {
-    <pat:PatAtomic> ":" <expr:Expr> => StructFieldKind::Simple { pat, expr },
-    ".." <expr:Expr> => StructFieldKind::Reuse(expr),
+    <pat:PatFunc> ":" <expr:Expr> => StructFieldKind::Simple { pat, expr },
     "..`" <expr:Expr> => StructFieldKind::Reuse(expr),
     <ident:Ident> => StructFieldKind::Ident(ident),
 }
@@ -683,6 +682,11 @@ PatAtomic: P<Pat> = {
     <lo:@L> "(" <pat:Pat> ")" <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Paren(pat),
+        span: Span::new(lo, hi),
+    }),
+    <lo:@L> "(" <op:Operator> ")" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Operator(op),
         span: Span::new(lo, hi),
     }),
 

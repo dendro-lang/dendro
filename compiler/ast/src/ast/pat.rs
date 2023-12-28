@@ -3,7 +3,7 @@ use dendro_span::{
     span::Span,
 };
 
-use super::{Lifetime, Mutability, RangeLimits, DUMMY_ID, P};
+use super::{Lifetime, Mutability, Operator, RangeLimits, DUMMY_ID, P};
 use crate::token;
 
 /// `#[attrs] ident: pat`
@@ -29,6 +29,8 @@ pub enum PatKind {
     Wildcard,
     /// `abc::def`,
     Path(Vec<P<Pat>>),
+    /// `(+)`,
+    Operator(Operator),
     /// `ref mut a @ pat`
     Ident(BindingMode, Mutability, Ident, Option<P<Pat>>),
     /// `[a, b, c]`
