@@ -420,23 +420,29 @@ ExprPathKind: ExprKind = {
 pub ExprPath: P<Expr> = ExprOf<ExprPathKind>;
 
 ExprDelimited: ExprKind = {
-    #[precedence(level = "0")]
     ExprPathKind,
     ExprArray,
 
     <e:ExprOf<ExprDelimited>> "`[" <index:Expr> "]" => ExprKind::Index(e, index),
+}
+
+ExprFunc: ExprKind = {
+    #[precedence(level = "0")]
+    ExprDelimited,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
     <e:ExprOf<ExprDelimited>> <op:Spanned<".">> <func:ExprPath> =>
         ExprKind::InfixCall(e, op.span, func),
 
     #[precedence(level = "2")] #[assoc(side = "left")]
-    <func:ExprOf<ExprDelimited>> <is_implicit:"?"?> <arg:ExprOf<ExprDelimited>> =>
-        ExprKind::Call(func, arg, is_implicit.is_some()),
+    <func:ExprOf<ExprDelimited>>
+        <implicit_args:("?" <ExprOf<ExprDelimited>>)*>
+        <args:ExprOf<ExprDelimited>+> =>
+        ExprKind::Call(func, implicit_args, args),
 }
 
 ExprUnary: ExprKind = {
-    ExprDelimited,
+    ExprFunc,
 
     <un:UnOp> <e:ExprOf<ExprUnary>> => ExprKind::Unary(un, e),
     "&" <l:Lifetime?> <m:Mutability> <e:ExprOf<ExprUnary>> => ExprKind::AddrOf(l, m, e),
@@ -533,16 +539,16 @@ ExprUnannotated: ExprKind = {
 
     #[precedence(level = "1")] #[assoc(side = "right")]
 
-    <lhs:ExprOf<ExprDelimited>> <op:Spanned<"=">> <rhs:Expr> =>
+    <lhs:ExprOf<ExprUnary>> <op:Spanned<"=">> <rhs:Expr> =>
         ExprKind::Assign(lhs, op.span, rhs),
 
-    <lhs:ExprOf<ExprDelimited>> <op:AssignOp> <rhs:Expr> =>
+    <lhs:ExprOf<ExprUnary>> <op:AssignOp> <rhs:Expr> =>
         ExprKind::AssignOp(lhs, op, rhs),
 
     "\\" <arg:PatOp> <ty:(":" <Expr>)?> "->" <body:Expr> =>
         ExprKind::Lambda(arg, ty, body),
 
-    <lhs:ExprOf<ExprDelimited>> ":" <rhs:Expr> => ExprKind::BelongsTo(lhs, rhs),
+    <lhs:ExprOf<ExprUnary>> ":" <rhs:Expr> => ExprKind::BelongsTo(lhs, rhs),
 
     #[precedence(level = "2")]
 
@@ -723,6 +729,8 @@ PatAtomic: P<Pat> = {
 }
 
 PatPath: P<Pat> = {
+    PatAtomic,
+
     <lo:@L> <segments:(<PatAtomic> "::")+> <last:PatAtomic> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Path(segments.into_iter().chain([last]).collect()),
@@ -735,41 +743,48 @@ PatPath: P<Pat> = {
     }),
 }
 
-PatOp: P<Pat> = {
+PatFunc: P<Pat> = {
     #[precedence(level = "0")]
-    PatAtomic,
-
     PatPath,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <lo:@L> <lhs:PatAtomic> "`..=" <rhs:PatAtomic> <hi:@R> => P(Pat {
+    <lo:@L>
+        <func:PatPath>
+        <implicit_args:("?" <PatPath>)*>
+        <args:PatPath+>
+    <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Call(func, implicit_args, args),
+        span: Span::new(lo, hi),
+    }),
+}
+
+PatOp: P<Pat> = {
+    #[precedence(level = "0")]
+    PatFunc,
+
+    #[precedence(level = "1")] #[assoc(side = "left")]
+    <lo:@L> <lhs:PatFunc> "`..=" <rhs:PatFunc> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(Some(lhs), RangeLimits::Closed, Some(rhs)),
         span: Span::new(lo, hi),
     }),
-    <lo:@L> <lhs:PatAtomic> "`..`" <rhs:PatAtomic> <hi:@R> => P(Pat {
+    <lo:@L> <lhs:PatFunc> "`..`" <rhs:PatFunc> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(Some(lhs), RangeLimits::HalfOpen, Some(rhs)),
         span: Span::new(lo, hi),
     }),
-    <lo:@L> <lhs:PatAtomic> "`.." <hi:@R> => P(Pat {
+    <lo:@L> <lhs:PatFunc> "`.." <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(Some(lhs), RangeLimits::HalfOpen, None),
         span: Span::new(lo, hi),
     }),
 
     #[precedence(level = "2")]
-    <r:RangeTo<PatAtomic>> => P(Pat {
+    <r:RangeTo<PatFunc>> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(None, r.0, Some(r.1)),
         span: r.2,
-    }),
-
-    #[precedence(level = "3")] #[assoc(side = "left")]
-    <lo:@L> <func:PatOp> <is_implicit:"?"?> <arg:PatOp> <hi:@R> => P(Pat {
-        id: DUMMY_ID,
-        kind: PatKind::Call(func, arg, is_implicit.is_some()),
-        span: Span::new(lo, hi),
     }),
 }
 

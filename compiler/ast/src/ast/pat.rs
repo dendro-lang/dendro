@@ -49,13 +49,8 @@ pub enum PatKind {
     Range(Option<P<Pat>>, RangeLimits, Option<P<Pat>>),
     /// `(pat)`
     Paren(P<Pat>),
-    /// `func arg`
-    Call(
-        P<Pat>,
-        P<Pat>,
-        /// is_implicit
-        bool,
-    ),
+    /// `func ..?implicit_args ..args`
+    Call(P<Pat>, Vec<P<Pat>>, Vec<P<Pat>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

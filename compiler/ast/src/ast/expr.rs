@@ -210,7 +210,7 @@ pub enum ExprKind {
     ///
     /// This is rare, and will be reduced soon after parsing.
     Vis(Visibility, P<Expr>),
-    /// `let x a = a`
+    /// `let x a := a`
     Let(Let),
     /// `if predicate then body else other`
     If(P<Expr>, P<Expr>, Option<P<Expr>>),
@@ -262,13 +262,8 @@ pub enum ExprKind {
     Continue(Option<Lifetime>),
     /// `return value`
     Return(Option<P<Expr>>),
-    /// `caller callee`
-    Call(
-        P<Expr>,
-        P<Expr>,
-        /// is_implicit
-        bool,
-    ),
+    /// `caller ..?implicit_args ..args`
+    Call(P<Expr>, Vec<P<Expr>>, Vec<P<Expr>>),
     /// `try expr`.
     Try(P<Expr>),
     /// `exists expr`.
