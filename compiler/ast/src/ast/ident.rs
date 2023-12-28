@@ -15,7 +15,7 @@ pub struct Mutability {
 }
 
 impl Mutability {
-    pub fn kw(kw: Symbol) -> Self {
+    pub const fn kw(kw: Symbol) -> Self {
         Mutability {
             id: DUMMY_ID,
             ident: Ident::with_dummy_span(kw),

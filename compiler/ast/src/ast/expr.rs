@@ -1,8 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{
-    Attribute, Lifetime, Mutability, Pat, PathRoot, Spanned, Stmt, Visibility, DUMMY_ID, P,
-};
+use super::{Attribute, Lifetime, Mutability, Pat, Spanned, Stmt, Visibility, DUMMY_ID, P};
 use crate::token;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -146,7 +144,16 @@ pub enum RangeLimits {
     Closed,
 }
 
-/// `#[attrs] pub pat: expr`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum StructFieldKind {
+    /// `pat: expr`
+    Simple { pat: P<Pat>, expr: P<Expr> },
+    /// `ident`
+    Ident(Ident),
+    /// `..default`
+    Reuse(P<Expr>),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StructField {
     pub prerequisites: Prerequisites,
@@ -154,16 +161,7 @@ pub struct StructField {
     pub id: u32,
     pub span: Span,
     pub visibility: Visibility,
-    pub pat: P<Pat>,
-    pub expr: P<Expr>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub enum StructRest {
-    Base(P<Expr>),
-    Rest,
-    #[default]
-    None,
+    pub kind: StructFieldKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -199,7 +197,7 @@ pub enum ExprKind {
     /// `ident`
     Ident(Ident),
     /// `abc::def`,
-    Path(PathRoot, Vec<P<Expr>>),
+    Path(Vec<P<Expr>>),
     /// `"abcde"`
     Literal(token::Lit),
     /// `(+)`
@@ -237,7 +235,7 @@ pub enum ExprKind {
     /// `(a, b, c)`
     Tuple(Vec<P<Expr>>),
     /// \``{ x: a, y: b }`
-    Struct(Vec<StructField>, StructRest),
+    Struct(Vec<StructField>),
     /// \``[ Some a, None ]`
     Enum(Vec<EnumField>),
     /// `'life: expr`
@@ -265,7 +263,12 @@ pub enum ExprKind {
     /// `return value`
     Return(Option<P<Expr>>),
     /// `caller callee`
-    Call(P<Expr>, P<Expr>, /** is_implicit */ bool),
+    Call(
+        P<Expr>,
+        P<Expr>,
+        /// is_implicit
+        bool,
+    ),
     /// `try expr`.
     Try(P<Expr>),
     /// `exists expr`.

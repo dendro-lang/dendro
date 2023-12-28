@@ -48,12 +48,12 @@ keywords![
     CONTINUE: "continue",
     FOR: "for",
     MATCH: "match",
-    LEAF: "leaf",
     TRY: "try",
     REF: "ref",
     THEN: "then",
     DO: "do",
     WITH: "with",
+    LEAF: "leaf",
     SUPER: "super",
     MOD: "mod",
 ];

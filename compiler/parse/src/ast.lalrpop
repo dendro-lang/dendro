@@ -101,12 +101,12 @@ extern {
         "KW:continue" => (_, T(token::Ident(kw::CONTINUE, false)), _),
         "KW:for" => (_, T(token::Ident(kw::FOR, false)), _),
         "KW:match" => (_, T(token::Ident(kw::MATCH, false)), _),
-        "KW:leaf" => (_, T(token::Ident(kw::LEAF, false)), _),
         "KW:try" => (_, T(token::Ident(kw::TRY, false)), _),
         "KW:ref" => (_, T(token::Ident(kw::REF, false)), _),
         "KW:then" => (_, T(token::Ident(kw::THEN, false)), _),
         "KW:do" => (_, T(token::Ident(kw::DO, false)), _),
         "KW:with" => (_, T(token::Ident(kw::WITH, false)), _),
+        "KW:leaf" => (_, T(token::Ident(kw::LEAF, false)), _),
         "KW:super" => (_, T(token::Ident(kw::SUPER, false)), _),
         "KW:mod" => (_, T(token::Ident(kw::MOD, false)), _),
 
@@ -283,10 +283,11 @@ Mutability: Mutability = {
     "#" <ident:Ident> => Mutability { id: DUMMY_ID, ident },
 }
 
-PathRoot: PathRoot = {
-    "KW:mod" => PathRoot::Module,
-    "KW:super" => PathRoot::Super,
-    "KW:leaf" => PathRoot::Leaf,
+#[inline]
+PathRoot: Ident = {
+    <sp:Spanned<"KW:leaf">> => Ident::new(kw::LEAF, sp.span),
+    <sp:Spanned<"KW:super">> => Ident::new(kw::SUPER, sp.span),
+    <sp:Spanned<"KW:mod">> => Ident::new(kw::MOD, sp.span),
 }
 
 // ------------------------------------------
@@ -335,12 +336,19 @@ ExprArray: ExprKind = {
     "[" <e:Expr> ";" <count:Expr> "]" => ExprKind::ArrayRepeated(e, count),
 }
 
+StructFieldKind: StructFieldKind = {
+    <pat:PatAtomic> ":" <expr:Expr> => StructFieldKind::Simple { pat, expr },
+    ".." <expr:Expr> => StructFieldKind::Reuse(expr),
+    "..`" <expr:Expr> => StructFieldKind::Reuse(expr),
+    <ident:Ident> => StructFieldKind::Ident(ident),
+}
+
 StructField: StructField = {
     <lo:@L>
         <prereq:(Prerequisites? @R)>
         <attrs:Attrs>
         <vis:Spanned<Visibility?>>
-        <pat:PatAtomic> ":" <e:Expr>
+        <kind:StructFieldKind>
     <hi:@R> => StructField {
         id: DUMMY_ID,
         prerequisites: prereq.0.unwrap_or_else(|| {
@@ -348,24 +356,13 @@ StructField: StructField = {
         }),
         attrs: cx.take_attr(attrs),
         visibility: vis.map(|v| v.unwrap_or_default()),
-        pat,
-        expr: e,
+        kind,
         span: Span::new(lo, hi),
     },
 }
 
-#[inline]
-StructRest: StructRest = {
-    "..`" <e:Expr> => StructRest::Base(e),
-    ".." => StructRest::Rest,
-}
-
 ExprStruct: ExprKind = {
-    "`" "{" <fields:Comma<StructField>> "}" => 
-        ExprKind::Struct(fields, StructRest::None),
-
-    "`" "{" <fields:(<StructField> ",")*> <rest:StructRest> "}" =>
-        ExprKind::Struct(fields, rest),
+    "`" "{" <fields:Comma<StructField>> "}" => ExprKind::Struct(fields),
 }
 
 EnumField: EnumField = {
@@ -405,29 +402,26 @@ ExprAtomic: ExprKind = {
     "_" => ExprKind::Underscore,
     ".." => ExprKind::Range(None, RangeLimits::HalfOpen, None),
     <ident:Ident> => ExprKind::Ident(ident),
+    <root:PathRoot> => ExprKind::Ident(root),
     <lit:"literal"> => ExprKind::Literal(lit),
-}
 
-#[inline]
-ExprPathKind: ExprKind = {
-    ExprAtomic,
-    <root:PathRoot> <segments:("::" <ExprOf<ExprAtomic>>)*> =>
-        ExprKind::Path(root, segments),
-}
-
-pub ExprPath: P<Expr> = ExprOf<ExprPathKind>;
-
-#[inline]
-ExprNonArray: ExprKind = {
-    ExprPathKind,
     ExprTuple,
     ExprStruct,
     ExprEnum,
 }
 
+#[inline]
+ExprPathKind: ExprKind = {
+    ExprAtomic,
+    <segments:(<ExprOf<ExprAtomic>> "::")+> <last:ExprOf<ExprAtomic>> =>
+        ExprKind::Path(segments.into_iter().chain([last]).collect()),
+}
+
+pub ExprPath: P<Expr> = ExprOf<ExprPathKind>;
+
 ExprDelimited: ExprKind = {
     #[precedence(level = "0")]
-    ExprNonArray,
+    ExprPathKind,
     ExprArray,
 
     <e:ExprOf<ExprDelimited>> "`[" <index:Expr> "]" => ExprKind::Index(e, index),
@@ -669,9 +663,17 @@ PatStruct: P<Pat> = {
         kind: PatKind::Struct(fields, true),
         span: Span::new(lo, hi),
     }),
+
+    <lo:@L> "{" "*" "}" <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::StructGlob,
+        span: Span::new(lo, hi),
+    }),
 }
 
 PatAtomic: P<Pat> = {
+    #[precedence(level = "0")]
+
     <lo:@L> "(" <pat:Pat> ")" <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Paren(pat),
@@ -699,12 +701,36 @@ PatAtomic: P<Pat> = {
     PatArray,
     PatTuple,
     PatStruct,
+
+    #[precedence(level = "1")] #[assoc(side = "left")]
+
+    <lo:@L> "&" <l:Lifetime?> <m:Mutability> <i:PatAtomic> <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Deref(l, m, i),
+        span: Span::new(lo, hi),
+    }),
+
+    #[precedence(level = "2")] #[assoc(side = "left")]
+
+    <lo:@L>
+        <i_lo:@L> <mode:BindingMode> <m:Mutability> <ident:Ident> <i_hi:@R>
+        <alias:("@" <PatAtomic>)?>
+    <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Ident(mode, m, ident, alias),
+        span: Span::new(lo, hi)
+    }),
 }
 
 PatPath: P<Pat> = {
+    <lo:@L> <segments:(<PatAtomic> "::")+> <last:PatAtomic> <hi:@R> => P(Pat {
+        id: DUMMY_ID,
+        kind: PatKind::Path(segments.into_iter().chain([last]).collect()),
+        span: Span::new(lo, hi),
+    }),
     <lo:@L> <root:PathRoot> <segments:("::" <PatAtomic>)*> <hi:@R> => P(Pat {
         id: DUMMY_ID,
-        kind: PatKind::Path(root, segments),
+        kind: PatKind::Path([P(Pat::from_ident(root))].into_iter().chain(segments).collect()),
         span: Span::new(lo, hi),
     }),
 }
@@ -716,47 +742,30 @@ PatOp: P<Pat> = {
     PatPath,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <lo:@L> <lhs:PatOp> "`..=" <rhs:PatOp> <hi:@R> => P(Pat {
+    <lo:@L> <lhs:PatAtomic> "`..=" <rhs:PatAtomic> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(Some(lhs), RangeLimits::Closed, Some(rhs)),
         span: Span::new(lo, hi),
     }),
-    <lo:@L> <lhs:PatOp> "`..`" <rhs:PatOp> <hi:@R> => P(Pat {
+    <lo:@L> <lhs:PatAtomic> "`..`" <rhs:PatAtomic> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(Some(lhs), RangeLimits::HalfOpen, Some(rhs)),
         span: Span::new(lo, hi),
     }),
-    <lo:@L> <lhs:PatOp> "`.." <hi:@R> => P(Pat {
+    <lo:@L> <lhs:PatAtomic> "`.." <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(Some(lhs), RangeLimits::HalfOpen, None),
         span: Span::new(lo, hi),
     }),
 
     #[precedence(level = "2")]
-    <r:RangeTo<PatOp>> => P(Pat {
+    <r:RangeTo<PatAtomic>> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Range(None, r.0, Some(r.1)),
         span: r.2,
     }),
 
-    #[precedence(level = "3")]
-    <lo:@L> "&" <l:Lifetime?> <m:Mutability> <i:PatOp> <hi:@R> => P(Pat {
-        id: DUMMY_ID,
-        kind: PatKind::Deref(l, m, i),
-        span: Span::new(lo, hi),
-    }),
-
-    #[precedence(level = "4")]
-    <lo:@L>
-        <i_lo:@L> <mode:BindingMode> <m:Mutability> <ident:Ident> <i_hi:@R>
-        <alias:("@" <PatOp>)?>
-    <hi:@R> => P(Pat {
-        id: DUMMY_ID,
-        kind: PatKind::Ident(mode, m, ident, alias),
-        span: Span::new(lo, hi)
-    }),
-
-    #[precedence(level = "5")] #[assoc(side = "left")]
+    #[precedence(level = "3")] #[assoc(side = "left")]
     <lo:@L> <func:PatOp> <is_implicit:"?"?> <arg:PatOp> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Call(func, arg, is_implicit.is_some()),

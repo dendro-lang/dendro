@@ -226,4 +226,22 @@ mod tests {
 
         println!("{unparen:?}");
     }
+
+    #[test]
+    fn use_tree() {
+        let diag = DiagCx::new();
+        let tts = dendro_lexer::parse(
+            "
+            #[alias]
+            let { * } := `{
+                ..std::cmp::`{ PartialEq, Eq },
+                ..std::hash::Hash,
+            };",
+            &diag,
+        );
+
+        let ts = parse(&diag, &tts).unwrap();
+
+        println!("{:?}", ts);
+    }
 }
