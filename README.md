@@ -22,7 +22,7 @@ let add: Add MyInt MyInt := Add `{
     output: MyInt,
 
     forall a, b where a: MyInt, b: MyInt =>
-    (+) (MyInt a) (MyInt b): a + b,
+    (+) (MyInt a) (MyInt b): MyInt (a + b),
 };
 
 let a := MyInt 1;
