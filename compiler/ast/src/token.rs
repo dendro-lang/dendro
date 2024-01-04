@@ -50,8 +50,6 @@ pub enum TokenKind {
     Colon,
     /// `::`
     ColonColon,
-    /// `:=`
-    ColonEq,
     /// `->`
     RArrow,
     /// `<-`
@@ -209,7 +207,6 @@ impl Token {
             },
             Colon => match joint.kind {
                 Colon => ColonColon,
-                Eq => ColonEq,
                 _ => return None,
             },
             SingleQuote => match joint.kind {
@@ -218,9 +215,9 @@ impl Token {
             },
 
             Le | EqEq | Ne | Ge | AndAnd | BackSlash | OrOr | Tilde | BinOpEq(..) | BackQuote
-            | At | DotDotEq | Comma | Semi | ColonColon | ColonEq | RArrow | LArrow | FatArrow
-            | Pound | Dollar | Question | OpenDelim(..) | CloseDelim(..) | Literal(..)
-            | Ident(..) | Lifetime(..) | DocComment(..) => return None,
+            | At | DotDotEq | Comma | Semi | ColonColon | RArrow | LArrow | FatArrow | Pound
+            | Dollar | Question | OpenDelim(..) | CloseDelim(..) | Literal(..) | Ident(..)
+            | Lifetime(..) | DocComment(..) => return None,
         };
 
         Some(Token::new(kind, self.span.to(&joint.span)))

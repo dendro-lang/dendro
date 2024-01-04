@@ -109,7 +109,7 @@ impl Prerequisites {
     }
 }
 
-/// `let x a := a`
+/// `let x a = a`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Let {
     pub pat: P<Pat>,
@@ -210,7 +210,7 @@ pub enum ExprKind {
     ///
     /// This is rare, and will be reduced soon after parsing.
     Vis(Visibility, P<Expr>),
-    /// `let x a := a`
+    /// `let x a = a`
     Let(Let),
     /// `if predicate then body else other`
     If(P<Expr>, P<Expr>, Option<P<Expr>>),
@@ -250,8 +250,6 @@ pub enum ExprKind {
     Assign(P<Expr>, Span, P<Expr>),
     /// `lhs += rhs`
     AssignOp(P<Expr>, BinOp, P<Expr>),
-    /// `slice[index]`
-    Index(P<Expr>, P<Expr>),
     /// `start..end` or `start..=end`
     Range(Option<P<Expr>>, RangeLimits, Option<P<Expr>>),
     /// `_`

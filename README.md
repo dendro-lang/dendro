@@ -12,20 +12,20 @@
 
 ```dendro
 #[alias]
-let { * } := `{
+let { * } = `{
     ..std::ops::{ Add },
 };
 
-let MyInt := u32;
+let MyInt = u32;
 
-let add: Add MyInt MyInt := Add `{
+let add: Add MyInt MyInt = Add `{
     output: MyInt,
 
     forall a, b where a: MyInt, b: MyInt =>
     (+) (MyInt a) (MyInt b): MyInt (a + b),
 };
 
-let a := MyInt 1;
+let a = MyInt 1;
 std::io::println "Hello, {}" (a + (MyInt 2))
 ```
 

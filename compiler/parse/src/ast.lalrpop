@@ -17,8 +17,7 @@ extern {
     enum SpacedToken<'diag> {
         "(" => (_, T(token::OpenDelim(token::Parenthesis)), _),
         ")" => (_, T(token::CloseDelim(token::Parenthesis)), _),
-        "`[" => (Spacing::Joint, T(token::OpenDelim(token::Bracket)), _),
-        "[" => (Spacing::Alone, T(token::OpenDelim(token::Bracket)), _),
+        "[" => (_, T(token::OpenDelim(token::Bracket)), _),
         "]" => (_, T(token::CloseDelim(token::Bracket)), _),
         "{" => (_, T(token::OpenDelim(token::Brace)), _),
         "}" => (_, T(token::CloseDelim(token::Brace)), _),
@@ -71,7 +70,6 @@ extern {
         ";" => (_, T(token::Semi), _),
         ":" => (_, T(token::Colon), _),
         "::" => (_, T(token::ColonColon), _),
-        ":=" => (_, T(token::ColonEq), _),
         "->" => (_, T(token::RArrow), _),
         "<-" => (_, T(token::LArrow), _),
         "=>" => (_, T(token::FatArrow), _),
@@ -215,14 +213,6 @@ Operator: Operator = {
     <lo:@L> "|" <hi:@R> => Operator::from_bin(BinOpKind::BitOr, Span::new(lo, hi)),
     <lo:@L> "<<" <hi:@R> => Operator::from_bin(BinOpKind::Shl, Span::new(lo, hi)),
     <lo:@L> ">>" <hi:@R> => Operator::from_bin(BinOpKind::Shr, Span::new(lo, hi)),
-
-    <lo:@L> Bracket "`" "]" <hi:@R> => Operator::Index(Span::new(lo, hi)),
-}
-
-#[inline]
-Bracket: () = {
-    "[" => (),
-    "`[" => (),
 }
 
 #[inline]
@@ -322,12 +312,12 @@ ExprOf<T>: P<Expr> = {
         id: DUMMY_ID,
         kind: sp.kind,
         span: sp.span,
-        attrs: cx.take_attr(vec![]),
+        attrs: cx.take_attr(Vec::new()),
     }),
 }
 
 ExprTuple: ExprKind = {
-    "(" ")" => ExprKind::Tuple(vec![]),
+    "(" ")" => ExprKind::Tuple(Vec::new()),
     "(" <fields:CommaTuple1<Expr>> ")" => ExprKind::Tuple(fields),
 }
 
@@ -379,7 +369,7 @@ EnumField: EnumField = {
 }
 
 ExprEnum: ExprKind = {
-    "`" Bracket <fields:Comma<EnumField>> "]" => ExprKind::Enum(fields),
+    "`" "[" <fields:Comma<EnumField>> "]" => ExprKind::Enum(fields),
 }
 
 ExprUnloadedBlock: ExprKind = {
@@ -421,23 +411,29 @@ pub ExprPath: P<Expr> = ExprOf<ExprPathKind>;
 ExprDelimited: ExprKind = {
     ExprPathKind,
     ExprArray,
-
-    <e:ExprOf<ExprDelimited>> "`[" <index:Expr> "]" => ExprKind::Index(e, index),
 }
 
-ExprFunc: ExprKind = {
+ExprInfix: ExprKind = {
     #[precedence(level = "0")]
     ExprDelimited,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <e:ExprOf<ExprDelimited>> <op:Spanned<".">> <func:ExprPath> =>
+    <e:ExprOf<ExprInfix>> <op:Spanned<".">> <func:ExprPath> =>
         ExprKind::InfixCall(e, op.span, func),
+}
 
-    #[precedence(level = "2")] #[assoc(side = "left")]
-    <func:ExprOf<ExprDelimited>>
-        <implicit_args:("?" <ExprOf<ExprDelimited>>)*>
-        <args:ExprOf<ExprDelimited>+> =>
+ExprFunc: ExprKind = {
+    #[precedence(level = "0")]
+    ExprInfix,
+
+    #[precedence(level = "1")] #[assoc(side = "left")]
+    <func:ExprOf<ExprInfix>>
+        <implicit_args:("?" <ExprOf<ExprDelimited>>)+>
+        <args:ExprOf<ExprDelimited>*> =>
         ExprKind::Call(func, implicit_args, args),
+    <func:ExprOf<ExprInfix>>
+        <args:ExprOf<ExprDelimited>+> =>
+        ExprKind::Call(func, Vec::new(), args),
 }
 
 ExprUnary: ExprKind = {
@@ -551,7 +547,7 @@ ExprUnannotated: ExprKind = {
 
     #[precedence(level = "2")]
 
-    "KW:let" <pat:PatOp> <ty:(":" <Expr>)?> ":=" <expr:LetExpr> =>
+    "KW:let" <pat:PatOp> <ty:(":" <ExprOf<ExprUnary>>)?> "=" <expr:LetExpr> =>
         ExprKind::Let(Let { pat, ty, expr }),
 
     "KW:if" <pred:Expr>
@@ -612,7 +608,7 @@ BindingMode: BindingMode = {
 PatTuple: P<Pat> = {
     <lo:@L> "(" ")" <hi:@R> => P(Pat {
         id: DUMMY_ID,
-        kind: PatKind::Tuple(vec![]),
+        kind: PatKind::Tuple(Vec::new()),
         span: Span::new(lo, hi),
     }),
     <lo:@L> "(" <fields:CommaTuple1<PatOp>> ")" <hi:@R> => P(Pat {
@@ -623,7 +619,7 @@ PatTuple: P<Pat> = {
 }
 
 PatArray: P<Pat> = {
-    <lo:@L> Bracket <fields:Comma<PatOp>> "]" <hi:@R> => P(Pat {
+    <lo:@L> "[" <fields:Comma<PatOp>> "]" <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Array(fields),
         span: Span::new(lo, hi),

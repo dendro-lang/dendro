@@ -3,7 +3,7 @@ lalrpop_mod!(
     #[allow(clippy::ptr_arg)]
     #[allow(clippy::unit_arg)]
     ast,
-    "/src/ast.rs"
+    "/ast.rs"
 );
 
 mod macros;
@@ -175,7 +175,7 @@ mod tests {
 
         let ts = parse(&diag, &tts).unwrap();
 
-        println!("{:#?}", ts);
+        println!("{:?}", ts);
     }
 
     #[test]
@@ -185,13 +185,13 @@ mod tests {
             "
             forall r where r: u32 =>
             #[allow(unused)]
-            pub let a r := r;",
+            pub let a r = r;",
             &diag,
         );
 
         let ts = parse(&diag, &tts).unwrap();
 
-        println!("{:#?}", ts);
+        println!("{:?}", ts);
     }
 
     #[test]
@@ -200,7 +200,7 @@ mod tests {
         let tts = dendro_lexer::parse(
             "
             forall t, a, b, c where a: t, b: t, c: t =>
-            pub let delta a b c := (b.pow 2) - ((*) 4 a) * c;",
+            pub let delta a b c = (b.pow 2) - ((*) 4 a) * c;",
             &diag,
         );
 
@@ -233,7 +233,7 @@ mod tests {
         let tts = dendro_lexer::parse(
             "
             #[alias]
-            let { * } := `{
+            let { * } = `{
                 ..std::cmp::`{ PartialEq, Eq },
                 ..std::hash::Hash,
             };",
