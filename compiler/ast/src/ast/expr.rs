@@ -1,6 +1,6 @@
 use dendro_span::{ident::Ident, span::Span};
 
-use super::{Attribute, Lifetime, Mutability, Pat, Spanned, Stmt, Visibility, DUMMY_ID, P};
+use super::{Attribute, Lifetime, Mutability, Pat, Spanned, Stmt, DUMMY_ID, P};
 use crate::token;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -160,7 +160,6 @@ pub struct StructField {
     pub attrs: Vec<Attribute>,
     pub id: u32,
     pub span: Span,
-    pub visibility: Visibility,
     pub kind: StructFieldKind,
 }
 
@@ -196,20 +195,14 @@ impl Block {
 pub enum ExprKind {
     /// `ident`
     Ident(Ident),
-    /// `abc::def`,
-    Path(Vec<P<Expr>>),
     /// `"abcde"`
     Literal(token::Lit),
     /// `(+)`
     Operator(Operator),
-    /// `expr .call`
-    InfixCall(P<Expr>, Span, P<Expr>),
+    /// `a.b.c`
+    Projection(Vec<P<Expr>>),
     /// `forall a where a > 1 :: expr`
     Prereq(Prerequisites, P<Expr>),
-    /// `pub(in path) expr`
-    ///
-    /// This is rare, and will be reduced soon after parsing.
-    Vis(Visibility, P<Expr>),
     /// `let x a = a`
     Let(Let),
     /// `if predicate then body else other`

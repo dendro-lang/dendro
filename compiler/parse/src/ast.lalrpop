@@ -129,15 +129,6 @@ extern {
 // ------------------------------------------
 // Units
 
-#[inline]
-Visibility: VisibilityKind = {
-    "KW:pub" "(" "KW:in" <e:ExprPath> ")" => VisibilityKind::Restricted {
-        path: e,
-        id: DUMMY_ID,
-    },
-    "KW:pub" => VisibilityKind::Public,
-}
-
 OuterAttr: Attribute = {
     <"outer attr"> =>? Ok(<>?),
     <lo:@L> <doc:"outer doc"> <hi:@R> => Attribute {
@@ -336,7 +327,6 @@ StructField: StructField = {
     <lo:@L>
         <prereq:(Prerequisites? @R)>
         <attrs:Attrs>
-        <vis:Spanned<Visibility?>>
         <kind:StructFieldKind>
     <hi:@R> => StructField {
         id: DUMMY_ID,
@@ -344,7 +334,6 @@ StructField: StructField = {
             Prerequisites::from_span(Span::new(lo, prereq.1))
         }),
         attrs: cx.take_attr(attrs),
-        visibility: vis.map(|v| v.unwrap_or_default()),
         kind,
         span: Span::new(lo, hi),
     },
@@ -397,42 +386,30 @@ ExprAtomic: ExprKind = {
     ExprTuple,
     ExprStruct,
     ExprEnum,
-}
-
-#[inline]
-ExprPathKind: ExprKind = {
-    ExprAtomic,
-    <segments:(<ExprOf<ExprAtomic>> "::")+> <last:ExprOf<ExprAtomic>> =>
-        ExprKind::Path(segments.into_iter().chain([last]).collect()),
-}
-
-pub ExprPath: P<Expr> = ExprOf<ExprPathKind>;
-
-ExprDelimited: ExprKind = {
-    ExprPathKind,
     ExprArray,
 }
 
-ExprInfix: ExprKind = {
+ExprProj: ExprKind = {
     #[precedence(level = "0")]
-    ExprDelimited,
+    ExprAtomic,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <e:ExprOf<ExprInfix>> <op:Spanned<".">> <func:ExprPath> =>
-        ExprKind::InfixCall(e, op.span, func),
+    <start:ExprOf<ExprAtomic>> <proj:("." <ExprOf<ExprAtomic>>)+> =>
+        ExprKind::Projection([start].into_iter().chain(proj).collect()),
 }
+
+pub Path: P<Expr> = ExprOf<ExprProj>;
 
 ExprFunc: ExprKind = {
     #[precedence(level = "0")]
-    ExprInfix,
+    ExprProj,
 
     #[precedence(level = "1")] #[assoc(side = "left")]
-    <func:ExprOf<ExprInfix>>
-        <implicit_args:("?" <ExprOf<ExprDelimited>>)+>
-        <args:ExprOf<ExprDelimited>*> =>
+    <func:ExprOf<ExprProj>>
+        <implicit_args:("?" <ExprOf<ExprProj>>)+>
+        <args:ExprOf<ExprProj>*> =>
         ExprKind::Call(func, implicit_args, args),
-    <func:ExprOf<ExprInfix>>
-        <args:ExprOf<ExprDelimited>+> =>
+    <func:ExprOf<ExprProj>> <args:ExprOf<ExprProj>+> =>
         ExprKind::Call(func, Vec::new(), args),
 }
 
@@ -581,8 +558,6 @@ ExprKind: ExprKind = {
     <l:Lifetime> ":" <e:Expr> => ExprKind::Annotated(l, e),
 
     <prereq:Prerequisites> <e:Expr> => ExprKind::Prereq(prereq, e),
-
-    <vis:Spanned<Visibility>> <e:ExprOf<ExprUnannotated>> => ExprKind::Vis(vis, e),
 }
 
 pub Expr: P<Expr> = {
@@ -731,14 +706,9 @@ PatAtomic: P<Pat> = {
 PatPath: P<Pat> = {
     PatAtomic,
 
-    <lo:@L> <segments:(<PatAtomic> "::")+> <last:PatAtomic> <hi:@R> => P(Pat {
+    <lo:@L> "::" <path:Path> <hi:@R> => P(Pat {
         id: DUMMY_ID,
-        kind: PatKind::Path(segments.into_iter().chain([last]).collect()),
-        span: Span::new(lo, hi),
-    }),
-    <lo:@L> <root:PathRoot> <segments:("::" <PatAtomic>)*> <hi:@R> => P(Pat {
-        id: DUMMY_ID,
-        kind: PatKind::Path([P(Pat::from_ident(root))].into_iter().chain(segments).collect()),
+        kind: PatKind::Path(path),
         span: Span::new(lo, hi),
     }),
 }

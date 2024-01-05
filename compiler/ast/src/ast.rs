@@ -35,19 +35,6 @@ impl<T> Spanned<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub enum VisibilityKind {
-    /// `pub`
-    Public,
-    /// Inherited
-    #[default]
-    Inherited,
-    /// `pub(in expr)`
-    Restricted { path: P<Expr>, id: u32 },
-}
-
-pub type Visibility = Spanned<VisibilityKind>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AttrArgs {
     /// `#[attr]`

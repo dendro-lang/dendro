@@ -79,7 +79,7 @@ fn parse_attr_inner<'diag>(
         )
     });
 
-    let path: P<Expr> = ast::ExprPathParser::new()
+    let path: P<Expr> = ast::PathParser::new()
         .parse(diag, &mut ParseCx::default(), TokenFrames::new(diag, path))
         .map_err(|err| to_diag(diag, err))?;
 
@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn test_attr() {
         let diag = DiagCx::new();
-        let tts = dendro_lexer::parse("self::path = 0", &diag);
+        let tts = dendro_lexer::parse("self.path = 0", &diag);
         let a = super::parse_attr_inner(&diag, &tts).unwrap();
         println!("{a:?}");
     }

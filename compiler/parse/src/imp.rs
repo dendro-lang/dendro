@@ -185,7 +185,7 @@ mod tests {
             "
             forall r where r: u32 =>
             #[allow(unused)]
-            pub let a r = r;",
+            let a r = r;",
             &diag,
         );
 
@@ -200,7 +200,7 @@ mod tests {
         let tts = dendro_lexer::parse(
             "
             forall t, a, b, c where a: t, b: t, c: t =>
-            pub let delta a b c = (b.pow 2) - ((*) 4 a) * c;",
+            let delta a b c = (b.pow 2) - ((*) 4 a) * c;",
             &diag,
         );
 
@@ -234,8 +234,8 @@ mod tests {
             "
             #[alias]
             let { * } = `{
-                ..std::cmp::`{ PartialEq, Eq },
-                ..std::hash::Hash,
+                ..std.cmp.`{ PartialEq, Eq },
+                ..std.hash.Hash,
             };",
             &diag,
         );
