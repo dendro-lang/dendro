@@ -61,14 +61,12 @@ pub type UnOp = Spanned<UnOpKind>;
 pub enum Operator {
     /// `(+)`
     Binary(BinOp),
-    /// `(`\``!)`
+    /// ``(`!)``
     Unary(UnOp),
     /// `(=)`
     Assign(Span),
     /// `(+=)`
     AssignBinary(BinOp),
-    /// `([`\``])`
-    Index(Span),
 }
 
 impl Operator {
@@ -201,7 +199,7 @@ pub enum ExprKind {
     Operator(Operator),
     /// `a.b.c`
     Projection(Vec<P<Expr>>),
-    /// `forall a where a > 1 :: expr`
+    /// `forall a where a > 1 => expr`
     Prereq(Prerequisites, P<Expr>),
     /// `let x a = a`
     Let(Let),
@@ -227,9 +225,9 @@ pub enum ExprKind {
     ArrayRepeated(P<Expr>, P<Expr>),
     /// `(a, b, c)`
     Tuple(Vec<P<Expr>>),
-    /// \``{ x: a, y: b }`
+    /// `` `{ x: a, y: b } ``
     Struct(Vec<StructField>),
-    /// \``[ Some a, None ]`
+    /// `` `[ Some a, None ] ``
     Enum(Vec<EnumField>),
     /// `'life: expr`
     Annotated(Lifetime, P<Expr>),
@@ -255,13 +253,13 @@ pub enum ExprKind {
     Return(Option<P<Expr>>),
     /// `caller ..?implicit_args ..args`
     Call(P<Expr>, Vec<P<Expr>>, Vec<P<Expr>>),
-    /// `try expr`.
+    /// `try expr`
     Try(P<Expr>),
-    /// `exists expr`.
+    /// `exists expr`
     Exists(P<Expr>),
-    /// `a: b`,
+    /// `a: b`
     BelongsTo(P<Expr>, P<Expr>),
-    /// (expr)
+    /// `(expr)`
     Paren(P<Expr>),
 }
 

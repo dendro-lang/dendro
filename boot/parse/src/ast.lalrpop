@@ -702,7 +702,7 @@ PatAtomic: P<Pat> = {
 PatPath: P<Pat> = {
     PatAtomic,
 
-    <lo:@L> "::" <path:Path> <hi:@R> => P(Pat {
+    <lo:@L> "`" <path:Path> <hi:@R> => P(Pat {
         id: DUMMY_ID,
         kind: PatKind::Path(path),
         span: Span::new(lo, hi),

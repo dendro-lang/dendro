@@ -27,7 +27,7 @@ pub enum BindingMode {
 pub enum PatKind {
     /// `_`
     Wildcard,
-    /// `::abc.def`,
+    /// `` `abc.def ``
     Path(P<Expr>),
     /// `(+)`,
     Operator(Operator),
