@@ -390,10 +390,8 @@ ExprAtomic: ExprKind = {
 }
 
 ExprProj: ExprKind = {
-    #[precedence(level = "0")]
     ExprAtomic,
 
-    #[precedence(level = "1")] #[assoc(side = "left")]
     <start:ExprOf<ExprAtomic>> <proj:("." <ExprOf<ExprAtomic>>)+> =>
         ExprKind::Projection([start].into_iter().chain(proj).collect()),
 }
@@ -401,10 +399,8 @@ ExprProj: ExprKind = {
 pub Path: P<Expr> = ExprOf<ExprProj>;
 
 ExprFunc: ExprKind = {
-    #[precedence(level = "0")]
     ExprProj,
 
-    #[precedence(level = "1")] #[assoc(side = "left")]
     <func:ExprOf<ExprProj>>
         <implicit_args:("?" <ExprOf<ExprProj>>)+>
         <args:ExprOf<ExprProj>*> =>
