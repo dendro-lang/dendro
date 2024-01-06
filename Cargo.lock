@@ -126,6 +126,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dendro-driver"
+version = "0.1.0"
+dependencies = [
+ "dendro-ast",
+ "dendro-error",
+ "dendro-lexer",
+ "dendro-parse",
+ "dendro-span",
+]
+
+[[package]]
 name = "dendro-error"
 version = "0.1.0"
 dependencies = [

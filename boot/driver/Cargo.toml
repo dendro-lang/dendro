@@ -1,0 +1,19 @@
+[package]
+edition = "2021"
+name = "dendro-driver"
+version = "0.1.0"
+
+[[bin]]
+name = "dendro"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Local crates
+dendro-ast = {path = "../ast"}
+dendro-error = {path = "../error"}
+dendro-lexer = {path = "../lexer"}
+dendro-parse = {path = "../parse"}
+dendro-span = {path = "../span"}
