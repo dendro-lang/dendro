@@ -3,7 +3,7 @@ use dendro_span::{
     span::Span,
 };
 
-use super::{Expr, Lifetime, Mutability, Operator, RangeLimits, DUMMY_ID, P};
+use super::{Expr, Lifetime, Mutability, Operator, RangeLimits, DUMMY_ID, P, Attribute};
 use crate::token;
 
 /// `#[attrs] ident: pat`
@@ -13,6 +13,7 @@ pub struct PatField {
     pub ident: Ident,
     pub pat: P<Pat>,
     pub span: Span,
+    pub attrs: Vec<Attribute>,
     pub is_shorthand: bool,
     pub is_placeholder: bool,
 }

@@ -88,20 +88,24 @@ pub struct Stmt {
 pub struct Leaf {
     pub id: u32,
     pub attrs: Vec<Attribute>,
-    pub stmts: Vec<P<Stmt>>,
+    pub stmts: Vec<Stmt>,
     pub span: Span,
 }
 
 impl Leaf {
-    pub fn load_block(self, mut block: Block) -> (Block, Vec<Attribute>) {
+    pub fn load_block(self, block: P<Block>) -> (P<Block>, Vec<Attribute>) {
         assert_eq!(block.kind, BlockKind::Unloaded);
 
-        block.kind = BlockKind::Loaded {
-            stmts: self.stmts,
-            is_inline: true,
-            span: self.span,
-        };
-        block.id = self.id;
+        let block = block.map(|mut block| {
+            block.kind = BlockKind::Loaded {
+                stmts: self.stmts,
+                is_inline: true,
+                span: self.span,
+            };
+            block.id = self.id;
+            block
+        });
+
         (block, self.attrs)
     }
 }

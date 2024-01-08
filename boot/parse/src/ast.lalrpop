@@ -344,14 +344,17 @@ ExprStruct: ExprKind = {
 }
 
 EnumField: EnumField = {
-    <prereq:(@L Prerequisites? @R)>
-    <attrs:Attrs>
-    <pat:PatOp> <ty:(":" <Expr>)?> => EnumField {
+    <lo:@L>
+        <prereq:(@L Prerequisites? @R)>
+        <attrs:Attrs>
+        <pat:PatOp> <ty:(":" <Expr>)?>
+    <hi:@R> => EnumField {
         prerequisites: prereq.1.unwrap_or_else(|| {
             Prerequisites::from_span(Span::new(prereq.0, prereq.2))
         }),
         attrs: cx.take_attr(attrs),
         id: DUMMY_ID,
+        span: Span::new(lo, hi),
         pat,
         ty,
     },
@@ -366,11 +369,11 @@ ExprUnloadedBlock: ExprKind = {
 }
 
 ExprBlock: ExprKind = {
-    "{" <leaf:Leaf> "}" => ExprKind::Block(P({
-        let (block, attr) = leaf.load_block(Block::unloaded());
+    "{" <leaf:Leaf> "}" => ExprKind::Block({
+        let (block, attr) = leaf.load_block(P(Block::unloaded()));
         cx.extend_attr(attr);
         block
-    })),
+    }),
 }
 
 ExprAtomic: ExprKind = {
@@ -483,13 +486,16 @@ ExprBinary: ExprKind = {
 }
 
 MatchArm: MatchArm = {
-    <lo:@L> <prereq:Prerequisites?> <hi:@R>
-    <attrs:Attrs>
-    "\\" <pat:Pat> "->" <expr:Expr> => MatchArm {
-        prerequisites: prereq.unwrap_or_else(|| {
-            Prerequisites::from_span(Span::new(lo, hi))
+    <lo:@L> <prereq:(@L Prerequisites? @R)>
+        <attrs:Attrs>
+        "\\" <pat:Pat> "->" <expr:Expr>
+    <hi:@R> => MatchArm {
+        prerequisites: prereq.1.unwrap_or_else(|| {
+            Prerequisites::from_span(Span::new(prereq.0, prereq.2))
         }),
         attrs: cx.take_attr(attrs),
+        id: DUMMY_ID,
+        span: Span::new(lo, hi),
         pat,
         expr,
     }
@@ -513,8 +519,8 @@ ExprUnannotated: ExprKind = {
     <lhs:ExprOf<ExprUnary>> <op:AssignOp> <rhs:Expr> =>
         ExprKind::AssignOp(lhs, op, rhs),
 
-    "\\" <arg:PatOp> <ty:(":" <Expr>)?> "->" <body:Expr> =>
-        ExprKind::Lambda(arg, ty, body),
+    "\\" <arg:PatLambda> <ty:(":" <Expr>)?> "->" <body:Expr> =>
+        ExprKind::Lambda(arg.0, arg.1, ty, body),
 
     <lhs:ExprOf<ExprUnary>> ":" <rhs:Expr> => ExprKind::BelongsTo(lhs, rhs),
 
@@ -598,7 +604,7 @@ PatArray: P<Pat> = {
 }
 
 PatField: PatField = {
-    <lo:@L>
+    <lo:@L> <attrs:Attrs>
         <mode:BindingMode> <m:Mutability> <ident:Ident>
     <hi:@R> => PatField {
         id: DUMMY_ID,
@@ -609,15 +615,17 @@ PatField: PatField = {
             span: Span::new(lo, hi),
         }),
         span: Span::new(lo, hi),
+        attrs: cx.take_attr(attrs),
         is_shorthand: false,
         is_placeholder: false,
     },
 
-    <lo:@L> <ident:Ident> ":" <pat:PatOp> <hi:@R> => PatField {
+    <lo:@L> <attrs:Attrs> <ident:Ident> ":" <pat:PatOp> <hi:@R> => PatField {
         id: DUMMY_ID,
         ident,
         pat,
         span: Span::new(lo, hi),
+        attrs: cx.take_attr(attrs),
         is_shorthand: true,
         is_placeholder: false,
     },
@@ -709,11 +717,13 @@ PatPath: P<Pat> = {
     }),
 }
 
+PatLambda: (Vec<P<Pat>>, Vec<P<Pat>>) = {
+    <implicit_args:("?" <PatPath>)*> <args:PatPath+> => (implicit_args, args),
+}
+
 PatFunc: P<Pat> = {
-    #[precedence(level = "0")]
     PatPath,
 
-    #[precedence(level = "1")] #[assoc(side = "left")]
     <lo:@L>
         <func:PatPath>
         <implicit_args:("?" <PatPath>)*>
@@ -767,29 +777,29 @@ Pat: P<Pat> = {
 // ------------------------------------------
 // Statements
 
-Stmt: P<Stmt> = {
-    <lo:@L> <e:Expr> ";" <hi:@R> => P(Stmt {
+Stmt: Stmt = {
+    <lo:@L> <e:Expr> ";" <hi:@R> => Stmt {
         id: DUMMY_ID,
         kind: StmtKind::Expr(e),
         span: Span::new(lo, hi),
-    }),
+    },
 
-    <lo:@L> ";" <hi:@R> => P(Stmt {
+    <lo:@L> ";" <hi:@R> => Stmt {
         id: DUMMY_ID,
         kind: StmtKind::Empty,
         span: Span::new(lo, hi),
-    }),
+    },
 }
 
-StmtSemi: P<Stmt> = {
-    <e:Expr> => P(Stmt {
+StmtSemi: Stmt = {
+    <e:Expr> => Stmt {
         id: DUMMY_ID,
         span: e.span,
         kind: StmtKind::Semi(e),
-    }),
+    },
 }
 
-Stmts: Vec<P<Stmt>> = {
+Stmts: Vec<Stmt> = {
     <mut stmts:Stmt*> <fin:StmtSemi?> => {
         stmts.extend(fin);
         stmts

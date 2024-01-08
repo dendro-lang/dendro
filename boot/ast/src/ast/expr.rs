@@ -121,6 +121,7 @@ pub struct EnumField {
     pub prerequisites: Prerequisites,
     pub attrs: Vec<Attribute>,
     pub id: u32,
+    pub span: Span,
     pub pat: P<Pat>,
     pub ty: Option<P<Expr>>,
 }
@@ -130,6 +131,8 @@ pub struct EnumField {
 pub struct MatchArm {
     pub prerequisites: Prerequisites,
     pub attrs: Vec<Attribute>,
+    pub id: u32,
+    pub span: Span,
     pub pat: P<Pat>,
     pub expr: P<Expr>,
 }
@@ -165,7 +168,7 @@ pub struct StructField {
 pub enum BlockKind {
     /// { stmts } or from another loaded file.
     Loaded {
-        stmts: Vec<P<Stmt>>,
+        stmts: Vec<Stmt>,
         is_inline: bool,
         /// Excluding the braces.
         span: Span,
@@ -233,8 +236,8 @@ pub enum ExprKind {
     Annotated(Lifetime, P<Expr>),
     /// `{ expr }`
     Block(P<Block>),
-    /// `\param: type -> body`
-    Lambda(P<Pat>, Option<P<Expr>>, P<Expr>),
+    /// `\..?implicit_args ..args: type -> body`
+    Lambda(Vec<P<Pat>>, Vec<P<Pat>>, Option<P<Expr>>, P<Expr>),
     /// `lhs = rhs`
     ///
     /// `span` is the span of `=`.

@@ -167,57 +167,50 @@ impl Token {
     }
 
     pub fn glue(&self, joint: &Self) -> Option<Self> {
-        let kind = match self.kind {
-            Eq => match joint.kind {
-                Eq => EqEq,
-                Gt => FatArrow,
-                _ => return None,
-            },
-            Lt => match joint.kind {
-                Eq => Le,
-                Lt => BinOp(Shl),
-                Le => BinOpEq(Shl),
-                BinOp(Minus) => LArrow,
-                _ => return None,
-            },
-            Gt => match joint.kind {
-                Eq => Ge,
-                Gt => BinOp(Shr),
-                Ge => BinOpEq(Shr),
-                _ => return None,
-            },
-            Not => match joint.kind {
-                Eq => Ne,
-                _ => return None,
-            },
-            BinOp(op) => match joint.kind {
-                Eq => BinOpEq(op),
-                BinOp(And) if op == And => AndAnd,
-                BinOp(Or) if op == Or => OrOr,
-                Gt if op == Minus => RArrow,
-                _ => return None,
-            },
-            Dot => match joint.kind {
-                Dot => DotDot,
-                _ => return None,
-            },
-            DotDot => match joint.kind {
-                Eq => DotDotEq,
-                _ => return None,
-            },
-            Colon => match joint.kind {
-                Colon => ColonColon,
-                _ => return None,
-            },
-            SingleQuote => match joint.kind {
-                Ident(name, false) => Lifetime(Symbol::new(&format!("'{name}"))),
-                _ => return None,
-            },
+        let kind = match (self.kind, joint.kind) {
+            (Eq, Eq) => EqEq,
+            (Eq, Gt) => FatArrow,
+            (Eq, _) => return None,
 
-            Le | EqEq | Ne | Ge | AndAnd | BackSlash | OrOr | Tilde | BinOpEq(..) | BackQuote
-            | At | DotDotEq | Comma | Semi | ColonColon | RArrow | LArrow | FatArrow | Pound
-            | Dollar | Question | OpenDelim(..) | CloseDelim(..) | Literal(..) | Ident(..)
-            | Lifetime(..) | DocComment(..) => return None,
+            (Lt, Eq) => Le,
+            (Lt, Lt) => BinOp(Shl),
+            (Lt, Le) => BinOpEq(Shl),
+            (Lt, BinOp(Minus)) => LArrow,
+            (Lt, _) => return None,
+
+            (Gt, Eq) => Ge,
+            (Gt, Gt) => BinOp(Shr),
+            (Gt, Ge) => BinOpEq(Shr),
+            (Gt, _) => return None,
+
+            (Not, Eq) => Ne,
+            (Not, _) => return None,
+
+            (BinOp(op), Eq) => BinOpEq(op),
+            (BinOp(And), BinOp(And)) => AndAnd,
+            (BinOp(Or), BinOp(Or)) => OrOr,
+            (BinOp(Minus), Gt) => RArrow,
+            (BinOp(_), _) => return None,
+
+            (Dot, Dot) => DotDot,
+            (Dot, _) => return None,
+
+            (DotDot, Eq) => DotDotEq,
+            (DotDot, _) => return None,
+
+            (Colon, Colon) => ColonColon,
+            (Colon, _) => return None,
+
+            (SingleQuote, Ident(name, false)) => Lifetime(Symbol::new(&format!("'{name}"))),
+            (SingleQuote, _) => return None,
+
+            (
+                Le | EqEq | Ne | Ge | AndAnd | BackSlash | OrOr | Tilde | BinOpEq(..) | BackQuote
+                | At | DotDotEq | Comma | Semi | ColonColon | RArrow | LArrow | FatArrow | Pound
+                | Dollar | Question | OpenDelim(..) | CloseDelim(..) | Literal(..) | Ident(..)
+                | Lifetime(..) | DocComment(..),
+                _,
+            ) => return None,
         };
 
         Some(Token::new(kind, self.span.to(&joint.span)))

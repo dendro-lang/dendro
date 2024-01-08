@@ -51,6 +51,10 @@ impl<T: 'static> P<T> {
         *self.ptr = f(*self.ptr)?;
         Some(self)
     }
+
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.ptr
+    }
 }
 
 impl<T: ?Sized> Deref for P<T> {
