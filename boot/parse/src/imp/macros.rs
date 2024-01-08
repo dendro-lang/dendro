@@ -19,13 +19,13 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
             return None;
         }
         let style = match self.current.lookahead(0) {
-            Some(TokenTree::Delimited(_, token::Bracket, _)) => AttrStyle::Outer,
-            Some(TokenTree::Token(Token {
-                kind: token::Not, ..
-            })) => match self.current.lookahead(1) {
-                Some(TokenTree::Delimited(_, token::Bracket, _)) => AttrStyle::Inner,
-                _ => return None,
-            },
+            Some(TokenTree::Delimited(_, _, token::Bracket, _)) => AttrStyle::Outer,
+            Some(TokenTree::Token(tk, _)) if tk.kind == token::Not => {
+                match self.current.lookahead(1) {
+                    Some(TokenTree::Delimited(_, _, token::Bracket, _)) => AttrStyle::Inner,
+                    _ => return None,
+                }
+            }
             _ => return None,
         };
 
@@ -68,15 +68,10 @@ fn parse_attr_inner<'diag>(
     tts: &TokenStream,
 ) -> PResult<'diag, (P<Expr>, AttrArgs)> {
     let trees = tts.trees();
-    let (path, mut arg) = trees.split_first(|tt, _| {
-        matches!(
-            tt,
-            TokenTree::Delimited(..)
-                | TokenTree::Token(Token {
-                    kind: token::Eq,
-                    ..
-                })
-        )
+    let (path, mut arg) = trees.split_first(|tt| match tt {
+        TokenTree::Delimited(..) => true,
+        TokenTree::Token(tk, _) if tk.kind == token::Eq => true,
+        _ => false,
     });
 
     let path: P<Expr> = ast::PathParser::new()
@@ -85,17 +80,14 @@ fn parse_attr_inner<'diag>(
 
     match arg.next() {
         None => Ok((path, AttrArgs::Empty)),
-        Some(&TokenTree::Token(Token {
-            kind: token::Eq,
-            span,
-        })) => {
+        Some(&TokenTree::Token(Token { kind: token::Eq, span }, _)) => {
             let expr: P<Expr> = ast::ExprParser::new()
                 .parse(diag, &mut ParseCx::default(), TokenFrames::new(diag, arg))
                 .map_err(|err| to_diag(diag, err))?;
 
             Ok((path, AttrArgs::Eq(span, expr)))
         }
-        Some(&TokenTree::Delimited(span, delim, ref tts)) => {
+        Some(&TokenTree::Delimited(span, _, delim, ref tts)) => {
             Ok((path, AttrArgs::Delimited(span, delim, tts.clone())))
         }
         _ => unreachable!(),

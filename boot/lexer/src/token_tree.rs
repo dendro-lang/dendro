@@ -1,6 +1,6 @@
 use dendro_ast::{
     token::{self, Token},
-    token_stream::{Spacing, TokenStream, TokenTree},
+    token_stream::{DelimSpacing, Spacing, TokenStream, TokenTree},
 };
 use dendro_error::{DiagCx, PResult};
 use dendro_span::span::DelimSpan;
@@ -30,12 +30,12 @@ where
         }
     }
 
-    fn next_token_tree(&mut self) -> PResult<'i, (TokenTree, Spacing)> {
+    fn next_token_tree(&mut self) -> PResult<'i, TokenTree> {
         match self.current {
             Some(token) => match token.kind {
                 token::OpenDelim(delim) => {
                     let open = token.span;
-                    self.bump();
+                    let open_spacing = self.bump();
 
                     let inner = self.token_trees_until_close_delim()?;
                     let Some(current) = self.current else {
@@ -47,10 +47,8 @@ where
                         return Err(err);
                     };
                     let close = current.span;
-                    match current.kind {
-                        token::TokenKind::CloseDelim(d) if d == delim => {
-                            self.bump();
-                        }
+                    let close_spacing = match current.kind {
+                        token::TokenKind::CloseDelim(d) if d == delim => self.bump(),
                         token::TokenKind::CloseDelim(d) => {
                             self.bump();
                             let mut error = self.diag_cx.error(None, true);
@@ -59,16 +57,19 @@ where
                             return Err(error);
                         }
                         _ => unreachable!(),
-                    }
+                    };
 
-                    let delimited =
-                        TokenTree::Delimited(DelimSpan::from_pair(open, close), delim, inner);
-                    Ok(delimited.into())
+                    Ok(TokenTree::Delimited(
+                        DelimSpan::from_pair(open, close),
+                        DelimSpacing::new(open_spacing, close_spacing),
+                        delim,
+                        inner,
+                    ))
                 }
                 token::CloseDelim(_) => unreachable!(),
                 _ => {
                     let spacing = self.bump();
-                    Ok((TokenTree::Token(token), spacing))
+                    Ok(TokenTree::Token(token, spacing))
                 }
             },
             None => unreachable!(),
@@ -86,10 +87,7 @@ where
         loop {
             let is_eof_or_close = matches!(
                 self.current,
-                None | Some(Token {
-                    kind: token::CloseDelim(_),
-                    ..
-                })
+                None | Some(Token { kind: token::CloseDelim(_), .. })
             );
             if is_eof_or_close {
                 break Ok(vec.build());
@@ -115,7 +113,7 @@ where
 }
 
 struct TokenStreamBuilder {
-    vec: Vec<(TokenTree, Spacing)>,
+    vec: Vec<TokenTree>,
 }
 
 impl TokenStreamBuilder {
@@ -123,16 +121,16 @@ impl TokenStreamBuilder {
         TokenStreamBuilder { vec: Vec::new() }
     }
 
-    fn push(&mut self, (tree, joint): (TokenTree, Spacing)) {
-        if let Some((TokenTree::Token(prev_token), Spacing::Joint)) = self.vec.last()
-            && let TokenTree::Token(token) = &tree
+    fn push(&mut self, tree: TokenTree) {
+        if let Some(TokenTree::Token(prev_token, Spacing::Joint)) = self.vec.last()
+            && let TokenTree::Token(ref token, joint) = tree
             && let Some(glued) = prev_token.glue(token)
         {
             self.vec.pop();
-            self.vec.push((TokenTree::Token(glued), joint));
+            self.vec.push(TokenTree::Token(glued, joint));
             return;
         }
-        self.vec.push((tree, joint))
+        self.vec.push(tree)
     }
 
     fn build(self) -> TokenStream {

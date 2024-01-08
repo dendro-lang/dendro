@@ -20,10 +20,7 @@ where
 pub fn parse(
     input: &str,
 ) -> Result<Tokens<'_, impl Iterator<Item = Pair<'_, Rule>> + '_>, Diagnostic> {
-    crate::imp::parse(input).map(|iter| Tokens {
-        iter,
-        last_span: None,
-    })
+    crate::imp::parse(input).map(|iter| Tokens { iter, last_span: None })
 }
 
 impl<'i, I> Tokens<'i, I>
@@ -87,11 +84,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) 
 
             let (kind, symbol) = lex_literal(inner, suffix_start);
             return Some(Token {
-                kind: token::Literal(Lit {
-                    kind,
-                    symbol,
-                    suffix,
-                }),
+                kind: token::Literal(Lit { kind, symbol, suffix }),
                 span: span.into(),
             });
         }
@@ -127,10 +120,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) 
         _ => unreachable!(),
     };
 
-    Some(Token {
-        kind,
-        span: span.into(),
-    })
+    Some(Token { kind, span: span.into() })
 }
 
 fn lex_comment(kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token> {

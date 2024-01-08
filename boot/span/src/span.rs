@@ -74,10 +74,7 @@ pub struct DelimSpan {
 
 impl DelimSpan {
     pub fn from_single(sp: Span) -> Self {
-        DelimSpan {
-            open: sp,
-            close: sp,
-        }
+        DelimSpan { open: sp, close: sp }
     }
 
     pub fn from_pair(open: Span, close: Span) -> Self {

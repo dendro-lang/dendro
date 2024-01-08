@@ -7,8 +7,8 @@ use crate::token::{Delimiter, Token};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TokenTree {
-    Token(Token),
-    Delimited(DelimSpan, Delimiter, TokenStream),
+    Token(Token, Spacing),
+    Delimited(DelimSpan, DelimSpacing, Delimiter, TokenStream),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -17,17 +17,23 @@ pub enum Spacing {
     Joint,
 }
 
-impl From<TokenTree> for (TokenTree, Spacing) {
-    fn from(value: TokenTree) -> Self {
-        (value, Spacing::Alone)
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct DelimSpacing {
+    pub open: Spacing,
+    pub close: Spacing,
+}
+
+impl DelimSpacing {
+    pub fn new(open: Spacing, close: Spacing) -> Self {
+        DelimSpacing { open, close }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct TokenStream(pub(crate) Arc<Vec<(TokenTree, Spacing)>>);
+pub struct TokenStream(pub(crate) Arc<Vec<TokenTree>>);
 
 impl TokenStream {
-    pub fn new(tokens: Vec<(TokenTree, Spacing)>) -> Self {
+    pub fn new(tokens: Vec<TokenTree>) -> Self {
         TokenStream(Arc::new(tokens))
     }
 
@@ -95,11 +101,11 @@ impl TokenStreamBuilder {
         // If `self` is not empty and the last tree within the last stream is a
         // token tree marked with `Joint`...
         if let Some(TokenStream(ref mut last_stream_lrc)) = self.0.last_mut()
-            && let Some((TokenTree::Token(last_token), Spacing::Joint)) = last_stream_lrc.last()
+            && let Some(TokenTree::Token(last_token, Spacing::Joint)) = last_stream_lrc.last()
             // ...and `stream` is not empty and the first tree within it is
             // a token tree...
             && let TokenStream(ref mut stream_lrc) = stream
-            && let Some((TokenTree::Token(token), spacing)) = stream_lrc.first()
+            && let Some(TokenTree::Token(token, spacing)) = stream_lrc.first()
             // ...and the two tokens can be glued together...
             && let Some(glued_tok) = last_token.glue(token)
         {
@@ -113,7 +119,7 @@ impl TokenStreamBuilder {
             // Overwrite the last token tree with the merged
             // token.
             let last_vec_mut = Arc::make_mut(last_stream_lrc);
-            *last_vec_mut.last_mut().unwrap() = (TokenTree::Token(glued_tok), *spacing);
+            *last_vec_mut.last_mut().unwrap() = TokenTree::Token(glued_tok, *spacing);
 
             // Remove the first token tree from `stream`. (This
             // is almost always the only tree in `stream`.)
@@ -168,34 +174,22 @@ impl IntoIterator for TokenStream {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CursorRef<'a>(&'a [(TokenTree, Spacing)]);
+pub struct CursorRef<'a>(&'a [TokenTree]);
 
 impl<'a> CursorRef<'a> {
     fn new(stream: &'a TokenStream) -> Self {
         CursorRef(&stream.0)
     }
 
-    pub fn next_with_spacing(&mut self) -> Option<&'a (TokenTree, Spacing)> {
-        match self {
-            CursorRef([first, next @ ..]) => {
-                *self = CursorRef(next);
-                Some(first)
-            }
-            _ => None,
-        }
-    }
-
     pub fn lookahead(&self, n: usize) -> Option<&'a TokenTree> {
-        self.0.get(n).map(|(tree, _)| tree)
+        self.0.get(n)
     }
 
-    pub fn next_pos(&self, mut pred: impl FnMut(&TokenTree, Spacing) -> bool) -> Option<usize> {
-        self.0
-            .iter()
-            .position(|&(ref tree, spacing)| pred(tree, spacing))
+    pub fn next_pos(&self, pred: impl FnMut(&TokenTree) -> bool) -> Option<usize> {
+        self.0.iter().position(pred)
     }
 
-    pub fn split_first(self, pred: impl FnMut(&TokenTree, Spacing) -> bool) -> (Self, Self) {
+    pub fn split_first(self, pred: impl FnMut(&TokenTree) -> bool) -> (Self, Self) {
         match self.next_pos(pred) {
             Some(pos) => {
                 let (a, b) = self.0.split_at(pos);
@@ -210,7 +204,13 @@ impl<'a> Iterator for CursorRef<'a> {
     type Item = &'a TokenTree;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_with_spacing().map(|(tree, _)| tree)
+        match self {
+            CursorRef([first, next @ ..]) => {
+                *self = CursorRef(next);
+                Some(first)
+            }
+            _ => None,
+        }
     }
 }
 
@@ -225,25 +225,19 @@ impl Cursor {
         Cursor { stream, index: 0 }
     }
 
-    pub fn next_with_spacing_ref(&mut self) -> Option<&(TokenTree, Spacing)> {
+    pub fn next_ref(&mut self) -> Option<&TokenTree> {
         self.stream.0.get(self.index).map(|tree| {
             self.index += 1;
             tree
         })
     }
 
-    pub fn next_with_spacing(&mut self) -> Option<(TokenTree, Spacing)> {
-        self.next_with_spacing_ref().cloned()
-    }
-
     pub fn lookahead(&self, n: usize) -> Option<&TokenTree> {
-        self.stream.0[self.index..].get(n).map(|(tree, _)| tree)
+        self.stream.0[self.index..].get(n)
     }
 
-    pub fn next_pos(&self, mut pred: impl FnMut(&TokenTree, Spacing) -> bool) -> Option<usize> {
-        self.stream.0[self.index..]
-            .iter()
-            .position(|&(ref tree, spacing)| pred(tree, spacing))
+    pub fn next_pos(&self, pred: impl FnMut(&TokenTree) -> bool) -> Option<usize> {
+        self.stream.0[self.index..].iter().position(pred)
     }
 
     pub fn into_stream(self) -> TokenStream {
@@ -256,6 +250,6 @@ impl Iterator for Cursor {
     type Item = TokenTree;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_with_spacing().map(|(tree, _)| tree)
+        self.next_ref().cloned()
     }
 }

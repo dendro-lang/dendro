@@ -12,9 +12,7 @@ pub struct P<T: ?Sized> {
 /// Construct a `P<T>` from a `T` value.
 #[allow(non_snake_case)]
 pub fn P<T: 'static>(value: T) -> P<T> {
-    P {
-        ptr: Box::new(value),
-    }
+    P { ptr: Box::new(value) }
 }
 
 impl<T: 'static> P<T> {
@@ -91,16 +89,12 @@ impl<T> fmt::Pointer for P<T> {
 
 impl<T> P<[T]> {
     pub fn new() -> P<[T]> {
-        P {
-            ptr: Box::default(),
-        }
+        P { ptr: Box::default() }
     }
 
     #[inline(never)]
     pub fn from_vec(v: Vec<T>) -> P<[T]> {
-        P {
-            ptr: v.into_boxed_slice(),
-        }
+        P { ptr: v.into_boxed_slice() }
     }
 
     #[inline(never)]

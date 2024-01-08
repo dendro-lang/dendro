@@ -41,10 +41,7 @@ pub struct Diagnostic {
 
 impl<R: RuleType> From<pest::error::Error<R>> for Diagnostic {
     fn from(err: pest::error::Error<R>) -> Self {
-        let mut diag = Diagnostic::new(Level::Error {
-            code: None,
-            is_fatal: true,
-        });
+        let mut diag = Diagnostic::new(Level::Error { code: None, is_fatal: true });
         let value = DiagUnit {
             span: Some(match err.location {
                 InputLocation::Pos(p) => Span::new(Pos(p), Pos(p + 1)),
@@ -62,10 +59,7 @@ impl<R: RuleType> From<pest::error::Error<R>> for Diagnostic {
 
 impl Diagnostic {
     pub const fn new(level: Level) -> Self {
-        Self {
-            level,
-            messages: Vec::new(),
-        }
+        Self { level, messages: Vec::new() }
     }
 
     pub fn error(code: Option<NonZeroU16>, is_fatal: bool) -> Self {

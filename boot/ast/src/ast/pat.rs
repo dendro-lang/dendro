@@ -3,7 +3,7 @@ use dendro_span::{
     span::Span,
 };
 
-use super::{Expr, Lifetime, Mutability, Operator, RangeLimits, DUMMY_ID, P, Attribute};
+use super::{Attribute, Expr, Lifetime, Mutability, Operator, RangeLimits, DUMMY_ID, P};
 use crate::token;
 
 /// `#[attrs] ident: pat`

@@ -61,7 +61,7 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
 
     fn expect_token(tt: Option<&'a TokenTree>, kind: TokenKind) {
         match tt {
-            Some(TokenTree::Token(tk)) if tk.kind == kind => {}
+            Some(TokenTree::Token(tk, _)) if tk.kind == kind => {}
             _ => panic!("unwrap_token: expected token"),
         }
     }
@@ -71,14 +71,14 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
         delim: Delimiter,
     ) -> (DelimSpan, &'a TokenStream) {
         match tt {
-            Some(&TokenTree::Delimited(dspan, d, ref tts)) if d == delim => (dspan, tts),
+            Some(&TokenTree::Delimited(dspan, _, d, ref tts)) if d == delim => (dspan, tts),
             _ => panic!("unwrap_delimited: expected delimited token"),
         }
     }
 
     fn next_token(&mut self) -> Option<(Pos, SpacedToken<'diag>, Pos)> {
-        Some(match self.current.next_with_spacing() {
-            Some(&(TokenTree::Token(Token { kind, span }), end)) => {
+        Some(match self.current.next() {
+            Some(&TokenTree::Token(Token { kind, span }, end)) => {
                 if let Some(ret) = self.parse_attr(kind, span) {
                     self.last_spacing = Spacing::Alone;
                     return Some(ret);
@@ -86,13 +86,13 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
                 let start = mem::replace(&mut self.last_spacing, end);
                 (span.start, (start, T(kind), end), span.end)
             }
-            Some(&(TokenTree::Delimited(span, delim, ref tts), s)) => {
-                let start = mem::replace(&mut self.last_spacing, s);
+            Some(&TokenTree::Delimited(span, spacing, delim, ref tts)) => {
+                let start = mem::replace(&mut self.last_spacing, spacing.open);
                 self.stack.push(Frame {
                     cursor: mem::replace(&mut self.current, tts.trees()),
                     delim,
                     close_span: span.close,
-                    close_spacing: s,
+                    close_spacing: spacing.close,
                 });
                 (
                     span.open.start,

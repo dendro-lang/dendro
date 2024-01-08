@@ -155,14 +155,14 @@ pub fn walk_delim_span(walk: &mut impl WalkMut, span: &mut DelimSpan) {
 pub fn walk_token_stream<W: WalkMut>(walk: &mut W, tts: &mut TokenStream) {
     if W::WALK_TOKENS && !tts.is_empty() {
         let tts = Arc::make_mut(&mut tts.0);
-        walk_slice(tts, |(tt, _)| walk_token_tree(walk, tt))
+        walk_slice(tts, |tt| walk_token_tree(walk, tt))
     }
 }
 
 pub fn walk_token_tree(walk: &mut impl WalkMut, tt: &mut TokenTree) {
     match tt {
-        TokenTree::Token(token) => walk_token(walk, token),
-        TokenTree::Delimited(span, _, tts) => {
+        TokenTree::Token(token, _) => walk_token(walk, token),
+        TokenTree::Delimited(span, _, _, tts) => {
             walk_delim_span(walk, span);
             walk_token_stream(walk, tts)
         }
