@@ -1,6 +1,7 @@
-use std::{env, fs, process};
+use std::{env, fs, panic, process};
 
 use dendro_error::DiagCx;
+use dendro_span::FatalError;
 
 fn run_compiler(args: &[String]) {
     let mut paths = args.iter().filter(|&arg| !arg.starts_with('-'));
@@ -45,6 +46,10 @@ fn run_compiler(args: &[String]) {
 pub fn main() -> ! {
     println!("Hello dendro!");
     let args = env::args().collect::<Vec<_>>();
-    run_compiler(&args[1..]);
-    process::exit(0)
+    let code = match panic::catch_unwind(|| run_compiler(&args[1..])) {
+        Ok(()) => 0,
+        Err(err) if err.is::<FatalError>() => 1,
+        Err(err) => panic::resume_unwind(err),
+    };
+    process::exit(code)
 }

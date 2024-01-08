@@ -16,7 +16,10 @@ use dendro_ast::{
     token_stream::{CursorRef, Spacing, TokenStream, TokenTree},
 };
 use dendro_error::{DiagCx, DiagnosticBuilder, PResult};
-use dendro_span::span::{DelimSpan, Pos, Span};
+use dendro_span::{
+    fatal_error,
+    span::{DelimSpan, Pos, Span},
+};
 use lalrpop_util::lalrpop_mod;
 
 #[derive(Debug, Clone)]
@@ -62,7 +65,7 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
     fn expect_token(tt: Option<&'a TokenTree>, kind: TokenKind) {
         match tt {
             Some(TokenTree::Token(tk, _)) if tk.kind == kind => {}
-            _ => panic!("unwrap_token: expected token"),
+            _ => fatal_error!("unwrap_token: expected token"),
         }
     }
 
@@ -72,7 +75,7 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
     ) -> (DelimSpan, &'a TokenStream) {
         match tt {
             Some(&TokenTree::Delimited(dspan, _, d, ref tts)) if d == delim => (dspan, tts),
-            _ => panic!("unwrap_delimited: expected delimited token"),
+            _ => fatal_error!("unwrap_delimited: expected delimited token"),
         }
     }
 

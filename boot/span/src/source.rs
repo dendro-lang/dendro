@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::{
+    fatal_error,
     span::{Pos, RelPos, Span},
     Loc, LocSpan,
 };
@@ -113,8 +114,9 @@ impl SourceMap {
     }
 
     pub fn new_source_file(&self, path: PathBuf, src: String) -> Arc<SourceFile> {
-        self.try_new_source_file(path, src)
-            .unwrap_or_else(|_| panic!("fatal error: the whole sum of file lengths exceeded 4GB"))
+        self.try_new_source_file(path, src).unwrap_or_else(|_| {
+            fatal_error!("the whole sum of file lengths exceeded 4GB");
+        })
     }
 
     pub fn get(&self, path: impl AsRef<Path>) -> Option<Arc<SourceFile>> {

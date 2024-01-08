@@ -1,6 +1,7 @@
 use std::{mem, sync::Arc};
 
 use dendro_span::{
+    fatal_error,
     ident::Ident,
     span::{DelimSpan, Span},
 };
@@ -196,7 +197,7 @@ pub fn default_flat_map_stmt(walk: &mut impl WalkMut, mut stmt: Stmt) -> SmallVe
         .map(|kind| Stmt { kind, ..stmt })
         .collect();
     if stmts.len() > 1 {
-        panic!("Cannot clone node ids directly")
+        fatal_error!("cloning node ids directly");
     }
     stmts
 }

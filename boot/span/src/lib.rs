@@ -4,10 +4,13 @@ use std::{ops::Range, sync::Arc};
 
 use source::SourceFile;
 
+mod fatal_error;
 pub mod ident;
 pub mod source;
 pub mod span;
 pub mod symbol;
+
+pub use self::fatal_error::FatalError;
 
 #[derive(Debug, Clone)]
 pub struct Loc {

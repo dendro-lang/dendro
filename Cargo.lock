@@ -146,6 +146,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dendro-expand"
+version = "0.1.0"
+dependencies = [
+ "dendro-ast",
+ "dendro-error",
+ "dendro-span",
+]
+
+[[package]]
 name = "dendro-lexer"
 version = "0.1.0"
 dependencies = [
