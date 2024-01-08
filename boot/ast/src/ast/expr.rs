@@ -264,6 +264,8 @@ pub enum ExprKind {
     BelongsTo(P<Expr>, P<Expr>),
     /// `(expr)`
     Paren(P<Expr>),
+    /// error expression
+    Err,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

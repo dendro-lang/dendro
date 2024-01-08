@@ -313,6 +313,7 @@ pub fn default_walk_expr(walk: &mut impl WalkMut, expr: &mut P<Expr>) {
             walk.walk_expr(ty)
         }
         ExprKind::Paren(expr) => walk.walk_expr(expr),
+        ExprKind::Err => {}
     }
     walk_slice(&mut expr.attrs, |attr| walk.walk_attribute(attr));
     walk.walk_id(&mut expr.id);
@@ -426,6 +427,7 @@ pub fn default_walk_pat(walk: &mut impl WalkMut, pat: &mut P<Pat>) {
             walk_slice(implicit_args, |arg| walk.walk_pat(arg));
             walk_slice(args, |arg| walk.walk_pat(arg));
         }
+        PatKind::Err => {}
     }
 }
 

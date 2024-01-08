@@ -90,6 +90,10 @@ impl Span {
         Span { start, end }
     }
 
+    pub const fn pos(pos: Pos) -> Self {
+        Self::new(pos, Pos(pos.0 + 1))
+    }
+
     pub fn to(&self, other: &Span) -> Span {
         Span::new(self.start, other.end)
     }

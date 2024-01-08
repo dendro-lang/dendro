@@ -131,8 +131,10 @@ version = "0.1.0"
 dependencies = [
  "dendro-ast",
  "dendro-error",
+ "dendro-expand",
  "dendro-lexer",
  "dendro-parse",
+ "dendro-resolve",
  "dendro-span",
 ]
 
@@ -142,7 +144,6 @@ version = "0.1.0"
 dependencies = [
  "dendro-span",
  "internment",
- "pest",
 ]
 
 [[package]]
@@ -181,6 +182,12 @@ dependencies = [
 [[package]]
 name = "dendro-resolve"
 version = "0.1.0"
+dependencies = [
+ "dendro-ast",
+ "dendro-error",
+ "dendro-expand",
+ "dendro-span",
+]
 
 [[package]]
 name = "dendro-span"

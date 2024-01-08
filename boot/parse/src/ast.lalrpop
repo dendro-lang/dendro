@@ -12,7 +12,7 @@ grammar<'diag, 'a>(
 
 extern {
     type Location = Pos;
-    type Error = dendro_error::DiagnosticBuilder<'diag>;
+    type Error = dendro_error::Error;
 
     enum SpacedToken<'diag> {
         "(" => (_, T(token::OpenDelim(token::Parenthesis)), _),
@@ -111,8 +111,8 @@ extern {
         "literal" => (_, T(token::Literal(<token::Lit>)), _),
         "ident" => (_, T(token::Ident(<Symbol>, _)), _),
         "lifetime" => (_, T(token::Lifetime(<Symbol>)), _),
-        "inner attr" => (_, InnerAttr(<PResult<'diag, Attribute>>), _),
-        "outer attr" => (_, OuterAttr(<PResult<'diag, Attribute>>), _),
+        "inner attr" => (_, InnerAttr(<Result<Attribute, Error>>), _),
+        "outer attr" => (_, OuterAttr(<Result<Attribute, Error>>), _),
         "inner doc" => (
             _,
             T(token::DocComment(<token::CommentKind>, AttrStyle::Inner, <Symbol>)),
@@ -560,6 +560,11 @@ ExprKind: ExprKind = {
     <l:Lifetime> ":" <e:Expr> => ExprKind::Annotated(l, e),
 
     <prereq:Prerequisites> <e:Expr> => ExprKind::Prereq(prereq, e),
+
+    // ! => {
+    //     span_expr_err(diag, <>);
+    //     ExprKind::Err
+    // },
 }
 
 pub Expr: P<Expr> = {
@@ -569,6 +574,16 @@ pub Expr: P<Expr> = {
         e.attrs.push(attr);
         e
     }),
+
+    <sp:Spanned<!>> => {
+        span_expr_err(diag, sp.kind);
+        P(Expr {
+            id: DUMMY_ID,
+            kind: ExprKind::Err,
+            span: sp.span,
+            attrs: cx.take_attr(Vec::new()),
+        })
+    },
 }
 
 // ------------------------------------------
@@ -772,6 +787,15 @@ Pat: P<Pat> = {
         kind: PatKind::Or(lhs.into_iter().chain([rhs]).collect()),
         span: Span::new(lo, hi),
     }),
+
+    <sp:Spanned<!>> => {
+        span_pat_err(diag, sp.kind);
+        P(Pat {
+            id: DUMMY_ID,
+            kind: PatKind::Err,
+            span: sp.span,
+        })
+    },
 }
 
 // ------------------------------------------

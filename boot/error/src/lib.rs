@@ -6,9 +6,8 @@ use std::{
     sync::Mutex,
 };
 
-use dendro_span::span::{Pos, Span};
+use dendro_span::span::Span;
 use internment::Intern;
-use pest::{error::InputLocation, RuleType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum Level {
@@ -33,28 +32,41 @@ pub struct DiagUnit {
     pub message: Intern<String>,
 }
 
+pub trait IntoMessage<'a> {
+    fn into_message(self) -> Cow<'a, str>;
+}
+
+impl<'a> IntoMessage<'a> for &'a str {
+    fn into_message(self) -> Cow<'a, str> {
+        Cow::Borrowed(self)
+    }
+}
+
+impl<'a> IntoMessage<'a> for String {
+    fn into_message(self) -> Cow<'a, str> {
+        Cow::Owned(self)
+    }
+}
+
+impl<'a> IntoMessage<'a> for Cow<'a, str> {
+    fn into_message(self) -> Cow<'a, str> {
+        self
+    }
+}
+
+impl<'a> IntoMessage<'a> for fmt::Arguments<'a> {
+    fn into_message(self) -> Cow<'a, str> {
+        match self.as_str() {
+            Some(s) => Cow::Borrowed(s),
+            None => Cow::Owned(format!("{self}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Diagnostic {
     pub level: Level,
     pub messages: Vec<DiagUnit>,
-}
-
-impl<R: RuleType> From<pest::error::Error<R>> for Diagnostic {
-    fn from(err: pest::error::Error<R>) -> Self {
-        let mut diag = Diagnostic::new(Level::Error { code: None, is_fatal: true });
-        let value = DiagUnit {
-            span: Some(match err.location {
-                InputLocation::Pos(p) => Span::new(Pos(p), Pos(p + 1)),
-                InputLocation::Span((start, end)) => Span::new(Pos(start), Pos(end)),
-            }),
-            message: match err.variant.message() {
-                Cow::Borrowed(s) => Intern::from_ref(s),
-                Cow::Owned(s) => Intern::new(s),
-            },
-        };
-        diag.messages.push(value);
-        diag
-    }
 }
 
 impl Diagnostic {
@@ -74,34 +86,24 @@ impl Diagnostic {
         Self::new(Level::Info)
     }
 
-    pub fn push_unspanned(&mut self, message: &str) -> &mut Self {
+    pub fn push_unspanned<'a>(&mut self, message: impl IntoMessage<'a>) -> &mut Self {
         self.messages.push(DiagUnit {
             span: None,
-            message: Intern::from_ref(message),
+            message: match message.into_message() {
+                Cow::Borrowed(s) => Intern::from_ref(s),
+                Cow::Owned(s) => Intern::new(s),
+            },
         });
         self
     }
 
-    pub fn push(&mut self, span: Span, message: &str) -> &mut Self {
+    pub fn push<'a>(&mut self, span: Span, message: impl IntoMessage<'a>) -> &mut Self {
         self.messages.push(DiagUnit {
             span: Some(span),
-            message: Intern::from_ref(message),
-        });
-        self
-    }
-
-    pub fn push_unspanned_fmt(&mut self, args: fmt::Arguments) -> &mut Self {
-        self.messages.push(DiagUnit {
-            span: None,
-            message: Intern::new(format!("{args}")),
-        });
-        self
-    }
-
-    pub fn push_fmt(&mut self, span: Span, args: fmt::Arguments) -> &mut Self {
-        self.messages.push(DiagUnit {
-            span: Some(span),
-            message: Intern::new(format!("{args}")),
+            message: match message.into_message() {
+                Cow::Borrowed(s) => Intern::from_ref(s),
+                Cow::Owned(s) => Intern::new(s),
+            },
         });
         self
     }
@@ -132,6 +134,12 @@ impl DiagCx {
 
     pub fn error(&self, code: Option<NonZeroU16>, is_fatal: bool) -> DiagnosticBuilder {
         self.new_diag(Level::Error { code, is_fatal })
+    }
+
+    pub fn span_err<'a>(&self, span: Span, message: impl IntoMessage<'a>) -> Error {
+        let mut err = self.error(None, false);
+        err.push(span, message);
+        err.emit()
     }
 
     pub fn warning(&self) -> DiagnosticBuilder {
@@ -167,11 +175,23 @@ impl<'a> DiagnosticBuilder<'a> {
         self.cx = None;
     }
 
-    pub fn emit(&mut self) {
+    pub fn emit(&mut self) -> Error {
         if let Some(cx) = self.cx.take() {
             cx.0.lock().unwrap().push(mem::take(&mut self.diag))
         }
+        Error(())
     }
 }
 
 pub type PResult<'a, T> = Result<T, DiagnosticBuilder<'a>>;
+
+#[derive(Debug, Clone)]
+pub struct Error(());
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl std::error::Error for Error {}

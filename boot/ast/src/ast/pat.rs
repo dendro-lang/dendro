@@ -54,6 +54,8 @@ pub enum PatKind {
     Paren(P<Pat>),
     /// `func ..?implicit_args ..args`
     Call(P<Pat>, Vec<P<Pat>>, Vec<P<Pat>>),
+    /// error pattern
+    Err,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

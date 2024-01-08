@@ -3,8 +3,8 @@ use dendro_ast::{
     token::{self, CommentKind, Lit, LitKind, Token},
     token_stream::Spacing,
 };
-use dendro_error::Diagnostic;
-use dendro_span::symbol::Symbol;
+use dendro_error::{DiagCx, Error};
+use dendro_span::{source::SourceFile, symbol::Symbol};
 use pest::{iterators::Pair, Span};
 
 use crate::imp::Rule;
@@ -17,10 +17,11 @@ where
     last_span: Option<Span<'i>>,
 }
 
-pub fn parse(
-    input: &str,
-) -> Result<Tokens<'_, impl Iterator<Item = Pair<'_, Rule>> + '_>, Diagnostic> {
-    crate::imp::parse(input).map(|iter| Tokens { iter, last_span: None })
+pub fn parse<'a>(
+    input: &'a SourceFile,
+    diag: &'a DiagCx,
+) -> Result<Tokens<'a, impl Iterator<Item = Pair<'a, Rule>> + 'a>, Error> {
+    crate::imp::parse(input, diag).map(|iter| Tokens { iter, last_span: None })
 }
 
 impl<'i, I> Tokens<'i, I>

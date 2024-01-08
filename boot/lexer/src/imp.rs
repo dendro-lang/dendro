@@ -1,5 +1,9 @@
-use dendro_error::Diagnostic;
-use pest::{iterators::Pair, Parser};
+use dendro_error::{DiagCx, Error};
+use dendro_span::{
+    source::SourceFile,
+    span::{RelPos, Span},
+};
+use pest::{error::InputLocation, iterators::Pair, Parser};
 use pest_derive::Parser;
 
 #[derive(Parser)]
@@ -20,10 +24,22 @@ impl Rule {
     }
 }
 
-pub fn parse(input: &str) -> Result<impl Iterator<Item = Pair<'_, Rule>> + '_, Diagnostic> {
-    match RawTokens::parse(Rule::Tokens, input) {
+pub fn parse<'a>(
+    input: &'a SourceFile,
+    diag: &'a DiagCx,
+) -> Result<impl Iterator<Item = Pair<'a, Rule>> + 'a, Error> {
+    match RawTokens::parse(Rule::Tokens, &input.src) {
         Ok(p) => Ok(p.flat_map(|p| p.into_inner().flat_map(|p| p.into_inner()))),
-        Err(e) => Err(e.into()),
+        Err(err) => Err({
+            let start_pos = input.start_pos;
+            let span = match err.location {
+                InputLocation::Pos(p) => Span::pos(start_pos + RelPos(p)),
+                InputLocation::Span((start, end)) => {
+                    Span::new(start_pos + RelPos(start), start_pos + RelPos(end))
+                }
+            };
+            diag.span_err(span, err.variant.message())
+        }),
     }
 }
 
@@ -31,7 +47,7 @@ pub fn parse(input: &str) -> Result<impl Iterator<Item = Pair<'_, Rule>> + '_, D
 mod tests {
     use pest::Parser;
 
-    use super::{parse, RawTokens, Rule};
+    use super::{RawTokens, Rule};
 
     enum Expect {
         Invalid,
@@ -113,7 +129,9 @@ mod tests {
 let main = println /* on console */ "Hello, {} {}!" 0x2a 2.5f64;
 // End of input.
 "#;
-        let mut p = parse(s).unwrap();
+        let mut p = RawTokens::parse(Rule::Tokens, s)
+            .unwrap()
+            .flat_map(|p| p.into_inner().flat_map(|p| p.into_inner()));
         assert_eq!(p.next().unwrap().as_str(), "/// Wow!");
         assert_eq!(p.next().unwrap().as_str(), "let");
         assert_eq!(p.next().unwrap().as_str(), "main");
@@ -127,7 +145,7 @@ let main = println /* on console */ "Hello, {} {}!" 0x2a 2.5f64;
         assert_eq!(p.next().unwrap().as_str(), "// End of input.");
         assert_eq!(p.next(), None);
 
-        for p in parse(s).unwrap() {
+        for p in RawTokens::parse(Rule::Tokens, s).unwrap() {
             println!("{p:?}")
         }
     }

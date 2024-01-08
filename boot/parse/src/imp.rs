@@ -15,7 +15,7 @@ use dendro_ast::{
     token::{Delimiter, Token, TokenKind},
     token_stream::{CursorRef, Spacing, TokenStream, TokenTree},
 };
-use dendro_error::{DiagCx, DiagnosticBuilder, PResult};
+use dendro_error::{DiagCx, DiagnosticBuilder, Error};
 use dendro_span::{
     fatal_error,
     span::{DelimSpan, Pos, Span},
@@ -25,16 +25,16 @@ use lalrpop_util::lalrpop_mod;
 #[derive(Debug, Clone)]
 pub enum Tk<'diag> {
     T(TokenKind),
-    InnerAttr(PResult<'diag, Attribute>),
-    OuterAttr(PResult<'diag, Attribute>),
+    InnerAttr(Result<Attribute, Error>),
+    OuterAttr(Result<Attribute, Error>),
     CusErr(DiagnosticBuilder<'diag>),
 }
 use Tk::*;
 
 type SpacedToken<'diag> = (Spacing, Tk<'diag>, Spacing);
 
-type ParseError<'diag> =
-    lalrpop_util::ParseError<Pos, SpacedToken<'diag>, DiagnosticBuilder<'diag>>;
+type ParseError<'diag> = lalrpop_util::ParseError<Pos, SpacedToken<'diag>, Error>;
+type ErrorRecovery<'diag> = lalrpop_util::ErrorRecovery<Pos, SpacedToken<'diag>, Error>;
 
 #[derive(Debug)]
 struct Frame<'a> {
@@ -167,14 +167,20 @@ pub fn parse<'diag>(diag: &'diag DiagCx, input: &TokenStream) -> Result<Leaf, Pa
     ast::LeafParser::new().parse(diag, &mut cx, tf)
 }
 
+fn span_expr_err<'diag>(_: &'diag DiagCx, _: ErrorRecovery<'diag>) {}
+
+fn span_pat_err<'diag>(_: &'diag DiagCx, _: ErrorRecovery<'diag>) {}
+
 #[cfg(test)]
 mod tests {
+    use dendro_span::source::SourceFile;
+
     use super::*;
 
     #[test]
     fn ident() {
         let diag = DiagCx::new();
-        let tts = dendro_lexer::parse("abcde", &diag);
+        let tts = dendro_lexer::parse(&SourceFile::test("abcde"), &diag);
 
         let ts = parse(&diag, &tts).unwrap();
 
@@ -185,10 +191,12 @@ mod tests {
     fn let_expr() {
         let diag = DiagCx::new();
         let tts = dendro_lexer::parse(
-            "
+            &SourceFile::test(
+                "
             forall r where r: u32 =>
             #[allow(unused)]
             let a r = r;",
+            ),
             &diag,
         );
 
@@ -201,9 +209,11 @@ mod tests {
     fn let_function() {
         let diag = DiagCx::new();
         let tts = dendro_lexer::parse(
-            "
+            &SourceFile::test(
+                "
             forall t, a, b, c where a: t, b: t, c: t =>
             let delta a b c = (b.pow 2) - ((*) 4 a) * c;",
+            ),
             &diag,
         );
 
@@ -218,10 +228,12 @@ mod tests {
         let unparen = parse(
             &diag,
             &dendro_lexer::parse(
-                "
+                &SourceFile::test(
+                    "
             iter.(map (\\x -> x + 1))
                 .(take 3)
                 .(collect ?(Vec i32))",
+                ),
                 &diag,
             ),
         )
@@ -234,12 +246,14 @@ mod tests {
     fn use_tree() {
         let diag = DiagCx::new();
         let tts = dendro_lexer::parse(
-            "
+            &SourceFile::test(
+                "
             #[alias]
             let { * } = `{
                 ..std.cmp.`{ PartialEq, Eq },
                 ..std.hash.Hash,
             };",
+            ),
             &diag,
         );
 

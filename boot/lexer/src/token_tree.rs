@@ -41,7 +41,7 @@ where
                 let inner = self.token_trees_until_close_delim()?;
                 let Some(current) = self.current else {
                     let mut err = self.diag_cx.error(None, true);
-                    err.push_fmt(
+                    err.push(
                         open,
                         format_args!("unclosed delimiter {delim:?}; found unexpected EOF"),
                     );
@@ -52,10 +52,10 @@ where
                     token::TokenKind::CloseDelim(d) if d == delim => self.bump(),
                     token::TokenKind::CloseDelim(d) => {
                         self.bump();
-                        let mut error = self.diag_cx.error(None, true);
-                        error.push_fmt(open, format_args!("unclosed delimiter {delim:?}"));
-                        error.push_fmt(close, format_args!("found {d:?}"));
-                        return Err(error);
+                        let mut err = self.diag_cx.error(None, true);
+                        err.push(open, format_args!("unclosed delimiter {delim:?}"));
+                        err.push(close, format_args!("found {d:?}"));
+                        return Err(err);
                     }
                     _ => unreachable!(),
                 };

@@ -47,6 +47,10 @@ impl SourceFile {
         }
     }
 
+    pub fn test(s: impl ToString) -> Self {
+        SourceFile::new("test".into(), s.to_string())
+    }
+
     pub fn relative_pos(&self, pos: Pos) -> RelPos {
         pos - self.start_pos
     }

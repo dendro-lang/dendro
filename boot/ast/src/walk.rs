@@ -187,6 +187,7 @@ pub fn default_walk_expr<'ast>(walk: &mut impl Walk<'ast>, expr: &'ast P<Expr>) 
             walk.walk_expr(ty)
         }
         ExprKind::Paren(expr) => walk.walk_expr(expr),
+        ExprKind::Err => {}
     }
     walk_many(&expr.attrs, |attr| walk.walk_attribute(attr));
 }
@@ -259,6 +260,7 @@ pub fn default_walk_pat<'ast>(walk: &mut impl Walk<'ast>, pat: &'ast P<Pat>) {
             walk_many(implicit_args, |arg| walk.walk_pat(arg));
             walk_many(args, |arg| walk.walk_pat(arg));
         }
+        PatKind::Err => {}
     }
 }
 

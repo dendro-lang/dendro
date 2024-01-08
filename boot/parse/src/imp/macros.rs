@@ -3,7 +3,7 @@ use dendro_ast::{
     token::{self, Token, TokenKind},
     token_stream::{Spacing, TokenStream, TokenTree},
 };
-use dendro_error::{DiagCx, DiagnosticBuilder, PResult};
+use dendro_error::{DiagCx, Error};
 use dendro_span::span::{Pos, Span};
 
 use super::{ParseError, SpacedToken};
@@ -63,10 +63,10 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
     }
 }
 
-fn parse_attr_inner<'diag>(
-    diag: &'diag DiagCx,
+fn parse_attr_inner(
+    diag: &DiagCx,
     tts: &TokenStream,
-) -> PResult<'diag, (P<Expr>, AttrArgs)> {
+) -> Result<(P<Expr>, AttrArgs), Error> {
     let trees = tts.trees();
     let (path, mut arg) = trees.split_first(|tt| match tt {
         TokenTree::Delimited(..) => true,
@@ -94,7 +94,7 @@ fn parse_attr_inner<'diag>(
     }
 }
 
-fn to_diag<'diag>(diag: &'diag DiagCx, err: ParseError<'diag>) -> DiagnosticBuilder<'diag> {
+fn to_diag<'diag>(diag: &'diag DiagCx, err: ParseError<'diag>) -> Error {
     match err {
         lalrpop_util::ParseError::InvalidToken { .. } => unreachable!(),
         lalrpop_util::ParseError::UnrecognizedEof { location, .. } => {
@@ -103,18 +103,18 @@ fn to_diag<'diag>(diag: &'diag DiagCx, err: ParseError<'diag>) -> DiagnosticBuil
                 Span::from(location),
                 "expected path expression, found end of the attribute",
             );
-            err
+            err.emit()
         }
         lalrpop_util::ParseError::UnrecognizedToken {
             token: (start, (_, token, _), end),
             ..
         } => {
             let mut err = diag.error(None, false);
-            err.push_fmt(
+            err.push(
                 Span::new(start, end),
                 format_args!("expected path expression, found {token:?}"),
             );
-            err
+            err.emit()
         }
         lalrpop_util::ParseError::ExtraToken { .. } => todo!(),
         lalrpop_util::ParseError::User { error } => error,
@@ -124,11 +124,12 @@ fn to_diag<'diag>(diag: &'diag DiagCx, err: ParseError<'diag>) -> DiagnosticBuil
 #[cfg(test)]
 mod tests {
     use dendro_error::DiagCx;
+    use dendro_span::source::SourceFile;
 
     #[test]
     fn test_attr() {
         let diag = DiagCx::new();
-        let tts = dendro_lexer::parse("self.path = 0", &diag);
+        let tts = dendro_lexer::parse(&SourceFile::test("self.path = 0"), &diag);
         let a = super::parse_attr_inner(&diag, &tts).unwrap();
         println!("{a:?}");
     }
