@@ -9,12 +9,12 @@ use dendro_span::{
 };
 
 pub use self::{expr::*, ident::*, pat::*, pointer::P};
+pub use crate::id::DUMMY_ID;
 use crate::{
+    id::NodeId,
     token::{CommentKind, Delimiter},
     token_stream::TokenStream,
 };
-
-pub const DUMMY_ID: u32 = u32::MAX;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Spanned<T> {
@@ -60,7 +60,7 @@ pub enum AttrStyle {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Attribute {
-    pub id: u32,
+    pub id: NodeId,
     pub style: AttrStyle,
     pub kind: AttrKind,
     pub span: Span,
@@ -78,7 +78,7 @@ pub enum StmtKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Stmt {
-    pub id: u32,
+    pub id: NodeId,
     pub kind: StmtKind,
     pub span: Span,
 }
@@ -86,7 +86,7 @@ pub struct Stmt {
 /// A binary unit: library/executable.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Leaf {
-    pub id: u32,
+    pub id: NodeId,
     pub attrs: Vec<Attribute>,
     pub stmts: Vec<Stmt>,
     pub span: Span,

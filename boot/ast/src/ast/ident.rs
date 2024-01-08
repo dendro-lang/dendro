@@ -1,16 +1,17 @@
 use dendro_span::{ident::Ident, symbol::Symbol};
 
 use super::DUMMY_ID;
+use crate::id::NodeId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Lifetime {
-    pub id: u32,
+    pub id: NodeId,
     pub ident: Ident,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Mutability {
-    pub id: u32,
+    pub id: NodeId,
     pub ident: Ident,
 }
 

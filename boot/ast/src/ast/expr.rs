@@ -1,7 +1,7 @@
 use dendro_span::{ident::Ident, span::Span};
 
 use super::{Attribute, Lifetime, Mutability, Pat, Spanned, Stmt, DUMMY_ID, P};
-use crate::token;
+use crate::{id::NodeId, token};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinOpKind {
@@ -90,7 +90,7 @@ impl Operator {
 /// `forall a where a > 1 ::`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Prerequisites {
-    pub id: u32,
+    pub id: NodeId,
     pub forall: Vec<Ident>,
     pub where_clause: Vec<P<Expr>>,
     pub span: Span,
@@ -120,7 +120,7 @@ pub struct Let {
 pub struct EnumField {
     pub prerequisites: Prerequisites,
     pub attrs: Vec<Attribute>,
-    pub id: u32,
+    pub id: NodeId,
     pub span: Span,
     pub pat: P<Pat>,
     pub ty: Option<P<Expr>>,
@@ -131,7 +131,7 @@ pub struct EnumField {
 pub struct MatchArm {
     pub prerequisites: Prerequisites,
     pub attrs: Vec<Attribute>,
-    pub id: u32,
+    pub id: NodeId,
     pub span: Span,
     pub pat: P<Pat>,
     pub expr: P<Expr>,
@@ -159,7 +159,7 @@ pub enum StructFieldKind {
 pub struct StructField {
     pub prerequisites: Prerequisites,
     pub attrs: Vec<Attribute>,
-    pub id: u32,
+    pub id: NodeId,
     pub span: Span,
     pub kind: StructFieldKind,
 }
@@ -179,7 +179,7 @@ pub enum BlockKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
-    pub id: u32,
+    pub id: NodeId,
     pub kind: BlockKind,
 }
 
@@ -270,7 +270,7 @@ pub enum ExprKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Expr {
-    pub id: u32,
+    pub id: NodeId,
     pub kind: ExprKind,
     pub span: Span,
     pub attrs: Vec<Attribute>,

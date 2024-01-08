@@ -63,10 +63,7 @@ impl<'a, 'diag> TokenFrames<'a, 'diag> {
     }
 }
 
-fn parse_attr_inner(
-    diag: &DiagCx,
-    tts: &TokenStream,
-) -> Result<(P<Expr>, AttrArgs), Error> {
+fn parse_attr_inner(diag: &DiagCx, tts: &TokenStream) -> Result<(P<Expr>, AttrArgs), Error> {
     let trees = tts.trees();
     let (path, mut arg) = trees.split_first(|tt| match tt {
         TokenTree::Delimited(..) => true,

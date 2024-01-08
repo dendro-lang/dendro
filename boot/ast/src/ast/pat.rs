@@ -4,12 +4,12 @@ use dendro_span::{
 };
 
 use super::{Attribute, Expr, Lifetime, Mutability, Operator, RangeLimits, DUMMY_ID, P};
-use crate::token;
+use crate::{id::NodeId, token};
 
 /// `#[attrs] ident: pat`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PatField {
-    pub id: u32,
+    pub id: NodeId,
     pub ident: Ident,
     pub pat: P<Pat>,
     pub span: Span,
@@ -60,7 +60,7 @@ pub enum PatKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Pat {
-    pub id: u32,
+    pub id: NodeId,
     pub kind: PatKind,
     pub span: Span,
 }

@@ -9,6 +9,7 @@ use smallvec::{smallvec, SmallVec};
 
 use crate::{
     ast::*,
+    id::NodeId,
     token,
     token_stream::{TokenStream, TokenTree},
 };
@@ -100,7 +101,7 @@ pub trait WalkMut: Sized {
         default_walk_attribute(self, attr)
     }
 
-    fn walk_id(&mut self, id: &mut u32) {
+    fn walk_id(&mut self, id: &mut NodeId) {
         let _ = id;
     }
 
