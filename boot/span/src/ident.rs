@@ -113,3 +113,9 @@ impl From<&str> for Ident {
         Self::with_dummy_span(Symbol::new(value))
     }
 }
+
+impl AsRef<std::path::Path> for Ident {
+    fn as_ref(&self) -> &std::path::Path {
+        std::path::Path::new(self.as_str())
+    }
+}
