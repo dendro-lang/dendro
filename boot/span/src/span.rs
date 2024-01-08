@@ -9,19 +9,52 @@ impl From<usize> for Pos {
     }
 }
 
-impl Add for Pos {
+impl Add<RelPos> for Pos {
     type Output = Pos;
 
-    fn add(self, rhs: Self) -> Self::Output {
+    fn add(self, rhs: RelPos) -> Self::Output {
         Pos(self.0 + rhs.0)
     }
 }
 
-impl Sub for Pos {
+impl Sub<RelPos> for Pos {
     type Output = Pos;
 
-    fn sub(self, rhs: Self) -> Self::Output {
+    fn sub(self, rhs: RelPos) -> Self::Output {
         Pos(self.0 - rhs.0)
+    }
+}
+
+impl Sub for Pos {
+    type Output = RelPos;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        RelPos(self.0 - rhs.0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct RelPos(pub usize);
+
+impl From<usize> for RelPos {
+    fn from(value: usize) -> Self {
+        RelPos(value)
+    }
+}
+
+impl Add for RelPos {
+    type Output = RelPos;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        RelPos(self.0 + rhs.0)
+    }
+}
+
+impl Sub for RelPos {
+    type Output = RelPos;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        RelPos(self.0 - rhs.0)
     }
 }
 

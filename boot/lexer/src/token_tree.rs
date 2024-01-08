@@ -32,46 +32,46 @@ where
 
     fn next_token_tree(&mut self) -> PResult<'i, TokenTree> {
         match self.current {
-            Some(token) => match token.kind {
-                token::OpenDelim(delim) => {
-                    let open = token.span;
-                    let open_spacing = self.bump();
+            Some(Token {
+                kind: token::OpenDelim(delim),
+                span: open,
+            }) => {
+                let open_spacing = self.bump();
 
-                    let inner = self.token_trees_until_close_delim()?;
-                    let Some(current) = self.current else {
-                        let mut err = self.diag_cx.error(None, true);
-                        err.push_fmt(
-                            open,
-                            format_args!("unclosed delimiter {delim:?}; found unexpected EOF"),
-                        );
-                        return Err(err);
-                    };
-                    let close = current.span;
-                    let close_spacing = match current.kind {
-                        token::TokenKind::CloseDelim(d) if d == delim => self.bump(),
-                        token::TokenKind::CloseDelim(d) => {
-                            self.bump();
-                            let mut error = self.diag_cx.error(None, true);
-                            error.push_fmt(open, format_args!("unclosed delimiter {delim:?}"));
-                            error.push_fmt(close, format_args!("found {d:?}"));
-                            return Err(error);
-                        }
-                        _ => unreachable!(),
-                    };
+                let inner = self.token_trees_until_close_delim()?;
+                let Some(current) = self.current else {
+                    let mut err = self.diag_cx.error(None, true);
+                    err.push_fmt(
+                        open,
+                        format_args!("unclosed delimiter {delim:?}; found unexpected EOF"),
+                    );
+                    return Err(err);
+                };
+                let close = current.span;
+                let close_spacing = match current.kind {
+                    token::TokenKind::CloseDelim(d) if d == delim => self.bump(),
+                    token::TokenKind::CloseDelim(d) => {
+                        self.bump();
+                        let mut error = self.diag_cx.error(None, true);
+                        error.push_fmt(open, format_args!("unclosed delimiter {delim:?}"));
+                        error.push_fmt(close, format_args!("found {d:?}"));
+                        return Err(error);
+                    }
+                    _ => unreachable!(),
+                };
 
-                    Ok(TokenTree::Delimited(
-                        DelimSpan::from_pair(open, close),
-                        DelimSpacing::new(open_spacing, close_spacing),
-                        delim,
-                        inner,
-                    ))
-                }
-                token::CloseDelim(_) => unreachable!(),
-                _ => {
-                    let spacing = self.bump();
-                    Ok(TokenTree::Token(token, spacing))
-                }
-            },
+                Ok(TokenTree::Delimited(
+                    DelimSpan::from_pair(open, close),
+                    DelimSpacing::new(open_spacing, close_spacing),
+                    delim,
+                    inner,
+                ))
+            }
+            Some(Token { kind: token::CloseDelim(_), .. }) => unreachable!(),
+            Some(token) => {
+                let spacing = self.bump();
+                Ok(TokenTree::Token(token, spacing))
+            }
             None => unreachable!(),
         }
     }
