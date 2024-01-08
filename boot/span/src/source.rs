@@ -5,14 +5,14 @@ use std::{
 };
 
 use crate::{
-    span::{Pos, RelPos},
-    Location,
+    span::{Pos, RelPos, Span},
+    Loc, LocSpan,
 };
 
 #[derive(Debug)]
 pub struct OffsetOverflow;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SourceFile {
     pub path: PathBuf,
     pub src: String,
@@ -71,7 +71,7 @@ impl SourceFile {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct SourceFiles {
     files: Vec<Arc<SourceFile>>,
     hashed: HashMap<PathBuf, Arc<SourceFile>>,
@@ -130,10 +130,25 @@ impl SourceMap {
         source_files.files[index - 1].clone()
     }
 
-    pub fn location(&self, pos: Pos) -> Location {
+    pub fn location(&self, pos: Pos) -> Loc {
         let file = self.source_file(pos);
         let (line, col) = file.line_col(pos);
-        Location { file, line, col }
+        Loc { file, line, col }
+    }
+
+    pub fn spanned_location(&self, span: Span) -> LocSpan {
+        let file = self.source_file(span.start);
+        debug_assert_eq!(self.source_file(span.end), file);
+
+        let (start_line, start_col) = file.line_col(span.start);
+        let (end_line, end_col) = file.line_col(span.end);
+
+        LocSpan {
+            file,
+            lines: start_line..end_line,
+            start_col,
+            end_col,
+        }
     }
 }
 
