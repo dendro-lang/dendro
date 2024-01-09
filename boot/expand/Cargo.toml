@@ -7,4 +7,6 @@ version = "0.1.0"
 # Local crates
 dendro-ast = {path = "../ast"}
 dendro-error = {path = "../error"}
+dendro-lexer = {path = "../lexer"}
+dendro-parse = {path = "../parse"}
 dendro-span = {path = "../span"}

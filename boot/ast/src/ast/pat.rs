@@ -113,6 +113,7 @@ impl Pat {
                 s.iter().for_each(|p| p.walk(it))
             }
 
+            // Sequence of function-like patterns.
             PatKind::Call(func, iargs, args) => {
                 func.walk(it);
                 iargs.iter().for_each(|arg| arg.walk(it));

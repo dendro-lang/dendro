@@ -4,7 +4,7 @@ mod pat;
 mod pointer;
 
 use dendro_span::{
-    span::{DelimSpan, Span},
+    span::{DelimSpan, Span, DUMMY_SPAN},
     symbol::Symbol,
 };
 
@@ -93,19 +93,28 @@ pub struct Leaf {
 }
 
 impl Leaf {
-    pub fn load_block(self, block: P<Block>) -> (P<Block>, Vec<Attribute>) {
+    pub fn dummy() -> Self {
+        Self::default()
+    }
+
+    pub fn load_block(self, block: &mut Block) -> Vec<Attribute> {
         assert_eq!(block.kind, BlockKind::Unloaded);
+        block.kind = BlockKind::Loaded {
+            stmts: self.stmts,
+            is_inline: true,
+            span: self.span,
+        };
+        self.attrs
+    }
+}
 
-        let block = block.map(|mut block| {
-            block.kind = BlockKind::Loaded {
-                stmts: self.stmts,
-                is_inline: true,
-                span: self.span,
-            };
-            block.id = self.id;
-            block
-        });
-
-        (block, self.attrs)
+impl Default for Leaf {
+    fn default() -> Self {
+        Leaf {
+            id: DUMMY_ID,
+            attrs: vec![],
+            stmts: vec![],
+            span: DUMMY_SPAN,
+        }
     }
 }

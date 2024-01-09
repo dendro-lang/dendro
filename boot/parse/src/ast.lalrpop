@@ -370,9 +370,9 @@ ExprUnloadedBlock: ExprKind = {
 
 ExprBlock: ExprKind = {
     "{" <leaf:Leaf> "}" => ExprKind::Block({
-        let (block, attr) = leaf.load_block(P(Block::unloaded()));
-        cx.extend_attr(attr);
-        block
+        let mut block = Block::unloaded();
+        cx.extend_attr(leaf.load_block(&mut block));
+        P(block)
     }),
 }
 

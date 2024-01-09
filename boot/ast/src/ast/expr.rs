@@ -275,3 +275,9 @@ pub struct Expr {
     pub span: Span,
     pub attrs: Vec<Attribute>,
 }
+
+impl PartialEq<Ident> for Expr {
+    fn eq(&self, other: &Ident) -> bool {
+        matches!(&self.kind, ExprKind::Ident(id) if id == other)
+    }
+}

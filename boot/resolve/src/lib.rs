@@ -1,7 +1,22 @@
 use dendro_ast::id::NodeId;
 
+#[derive(Debug)]
 pub struct Resolver {
     next_node_id: NodeId,
+}
+
+impl Default for Resolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Resolver {
+    pub fn new() -> Self {
+        Self {
+            next_node_id: NodeId::from_u32(0),
+        }
+    }
 }
 
 impl dendro_expand::Resolver for Resolver {

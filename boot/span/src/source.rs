@@ -112,7 +112,8 @@ impl SourceMap {
         let file = Arc::new(file);
 
         source_files.files.push(file.clone());
-        source_files.hashed.insert(path, file.clone());
+        let _old = source_files.hashed.insert(path, file.clone());
+        debug_assert!(_old.is_none());
 
         Ok(file)
     }
@@ -126,6 +127,11 @@ impl SourceMap {
     pub fn get(&self, path: impl AsRef<Path>) -> Option<Arc<SourceFile>> {
         let source_files = self.source_files.read().unwrap();
         source_files.hashed.get(path.as_ref()).cloned()
+    }
+
+    pub fn contains(&self, path: impl AsRef<Path>) -> bool {
+        let source_files = self.source_files.read().unwrap();
+        source_files.hashed.contains_key(path.as_ref())
     }
 
     pub fn source_file(&self, pos: Pos) -> Arc<SourceFile> {

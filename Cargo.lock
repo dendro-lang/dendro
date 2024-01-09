@@ -152,6 +152,8 @@ version = "0.1.0"
 dependencies = [
  "dendro-ast",
  "dendro-error",
+ "dendro-lexer",
+ "dendro-parse",
  "dendro-span",
 ]
 
