@@ -97,11 +97,11 @@ impl Leaf {
         Self::default()
     }
 
-    pub fn load_block(self, block: &mut Block) -> Vec<Attribute> {
+    pub fn load_block(self, block: &mut Block, is_inline: bool) -> Vec<Attribute> {
         assert_eq!(block.kind, BlockKind::Unloaded);
         block.kind = BlockKind::Loaded {
             stmts: self.stmts,
-            is_inline: true,
+            is_inline,
             span: self.span,
         };
         self.attrs

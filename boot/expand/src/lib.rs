@@ -22,7 +22,7 @@ pub trait Resolver {
 }
 
 struct Expander<'a> {
-    source_map: &'a SourceMap,
+    sources: &'a SourceMap,
     diag: &'a DiagCx,
     resolver: &'a mut dyn Resolver,
 
@@ -38,8 +38,8 @@ impl<'a> WalkMut for Expander<'a> {
             && let ExprKind::Block(block) = &mut expr.get_mut().kind
             && let BlockKind::Unloaded = block.kind
         {
-            let (leaf, module) = self::module::parse(self.diag, self.source_map, &self.cur, ident);
-            let attrs = leaf.load_block(block.get_mut());
+            let (leaf, module) = self::module::parse(self.diag, self.sources, &self.cur, ident);
+            let attrs = leaf.load_block(block.get_mut(), false);
             expr.get_mut().attrs.extend(attrs);
 
             walk_mut::default_walk_pat(self, pat);
@@ -65,14 +65,14 @@ impl<'a> WalkMut for Expander<'a> {
 }
 
 pub fn expand(
-    source_map: &SourceMap,
+    sources: &SourceMap,
     diag: &DiagCx,
     resolver: &mut dyn Resolver,
     mut leaf: Leaf,
 ) -> Result<Leaf, Error> {
-    let sfile = source_map.source_file(leaf.span.start);
+    let sfile = sources.source_file(leaf.span.start);
     let mut expander = Expander {
-        source_map,
+        sources,
         diag,
         resolver,
         cur: Module {
