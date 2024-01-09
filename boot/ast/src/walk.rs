@@ -239,7 +239,8 @@ pub fn default_walk_pat<'ast>(walk: &mut impl Walk<'ast>, pat: &'ast P<Pat>) {
         PatKind::Wildcard => {}
         PatKind::Path(expr) => walk.walk_expr(expr),
         PatKind::Operator(op) => walk.walk_operator(op),
-        PatKind::Ident(_, _, ident, alias) => {
+        PatKind::Ident(_, mutb, ident, alias) => {
+            walk.walk_mutability(mutb);
             walk.walk_ident(ident);
             walk_opt(alias, |alias| walk.walk_pat(alias))
         }

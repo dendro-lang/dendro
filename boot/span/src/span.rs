@@ -66,15 +66,6 @@ pub struct Span {
 
 pub const DUMMY_SPAN: Span = Span::new(Pos(0), Pos(0));
 
-impl From<pest::Span<'_>> for Span {
-    fn from(value: pest::Span<'_>) -> Self {
-        Span {
-            start: value.start().into(),
-            end: value.end().into(),
-        }
-    }
-}
-
 impl From<Pos> for Span {
     fn from(value: Pos) -> Self {
         Span {

@@ -32,9 +32,8 @@ struct Expander<'a> {
 impl<'a> WalkMut for Expander<'a> {
     const WALK_TOKENS: bool = false;
 
-    fn walk_expr(&mut self, expr: &mut P<Expr>) {
-        let root = expr.get_mut();
-        if let ExprKind::Let(Let { pat, expr, .. }) = &mut root.kind
+    fn walk_expr(&mut self, root: &mut P<Expr>) {
+        if let ExprKind::Let(Let { pat, ty, expr }) = &mut root.get_mut().kind
             && let Some(ident) = pat.as_path_ident()
             && let ExprKind::Block(block) = &mut expr.get_mut().kind
             && let BlockKind::Unloaded = block.kind
@@ -43,11 +42,18 @@ impl<'a> WalkMut for Expander<'a> {
             let attrs = leaf.load_block(block.get_mut());
             expr.get_mut().attrs.extend(attrs);
 
+            walk_mut::default_walk_pat(self, pat);
+            walk_mut::walk_opt(ty, |ty| walk_mut::default_walk_expr(self, ty));
+
             let orig = mem::replace(&mut self.cur, module);
             walk_mut::default_walk_expr(self, expr);
             self.cur = orig;
+
+            walk_mut::walk_slice(&mut root.get_mut().attrs, |attr| self.walk_attribute(attr));
+            self.walk_id(&mut root.get_mut().id);
+            self.walk_span(&mut root.get_mut().span);
         } else {
-            walk_mut::default_walk_expr(self, expr)
+            walk_mut::default_walk_expr(self, root)
         }
     }
 

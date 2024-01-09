@@ -18,7 +18,7 @@ enum ModError {
 #[derive(Debug, Default)]
 struct SubmodPath {
     path: PathBuf,
-    relative: Option<Ident>,
+    prefix: PathBuf,
 }
 
 #[derive(Debug, Default)]
@@ -46,14 +46,9 @@ pub fn parse(diag: &DiagCx, sources: &SourceMap, cur: &Module, ident: Ident) -> 
         .map_err(|err| report_err(diag, cur, ident.span, err))
         .unwrap_or_default();
 
-    let prefix = match submod.relative {
-        Some(rel) => cur.prefix.join(rel),
-        None => cur.prefix.to_path_buf(),
-    };
-
     let module = Module {
         path: submod.path.clone(),
-        prefix,
+        prefix: submod.prefix,
         file_stack: cur
             .file_stack
             .iter()
@@ -71,13 +66,11 @@ fn submod_path(prefix: &Path, ident: Ident) -> Result<SubmodPath, ModError> {
 fn default_submod_path(prefix: &Path, ident: Ident) -> Result<SubmodPath, ModError> {
     let same_dir = prefix.join(format!("{ident}.dd"));
     let subdir = prefix.join(format!("{ident}{MAIN_SEPARATOR}mod.dd"));
+    let dir = prefix.join(ident);
 
     match (same_dir.exists(), subdir.exists()) {
-        (true, false) => Ok(SubmodPath {
-            path: same_dir,
-            relative: Some(ident),
-        }),
-        (false, true) => Ok(SubmodPath { path: subdir, relative: None }),
+        (true, false) => Ok(SubmodPath { path: same_dir, prefix: dir }),
+        (false, true) => Ok(SubmodPath { path: subdir, prefix: dir }),
         (false, false) => Err(ModError::NotFound(ident, same_dir, subdir)),
         (true, true) => Err(ModError::Ambiguous(ident, same_dir, subdir)),
     }

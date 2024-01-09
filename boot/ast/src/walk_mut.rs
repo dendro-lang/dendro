@@ -407,7 +407,8 @@ pub fn default_walk_pat(walk: &mut impl WalkMut, pat: &mut P<Pat>) {
         PatKind::Wildcard => {}
         PatKind::Path(expr) => walk.walk_expr(expr),
         PatKind::Operator(op) => walk.walk_operator(op),
-        PatKind::Ident(_, _, ident, alias) => {
+        PatKind::Ident(_, mutb, ident, alias) => {
+            walk.walk_mutability(mutb);
             walk.walk_ident(ident);
             walk_opt(alias, |alias| walk.walk_pat(alias))
         }
@@ -430,6 +431,8 @@ pub fn default_walk_pat(walk: &mut impl WalkMut, pat: &mut P<Pat>) {
         }
         PatKind::Err => {}
     }
+    walk.walk_id(&mut pat.id);
+    walk.walk_span(&mut pat.span);
 }
 
 pub fn default_walk_pat_field(walk: &mut impl WalkMut, field: &mut PatField) {

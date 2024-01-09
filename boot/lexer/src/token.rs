@@ -4,7 +4,7 @@ use dendro_ast::{
     token_stream::Spacing,
 };
 use dendro_error::{DiagCx, Error};
-use dendro_span::{source::SourceFile, symbol::Symbol};
+use dendro_span::{source::SourceFile, span::RelPos, symbol::Symbol};
 use pest::{iterators::Pair, Span};
 
 use crate::imp::Rule;
@@ -15,13 +15,14 @@ where
 {
     iter: I,
     last_span: Option<Span<'i>>,
+    input: &'i SourceFile,
 }
 
 pub fn parse<'a>(
     input: &'a SourceFile,
     diag: &'a DiagCx,
 ) -> Result<Tokens<'a, impl Iterator<Item = Pair<'a, Rule>> + 'a>, Error> {
-    crate::imp::parse(input, diag).map(|iter| Tokens { iter, last_span: None })
+    crate::imp::parse(input, diag).map(|iter| Tokens { iter, last_span: None, input })
 }
 
 impl<'i, I> Tokens<'i, I>
@@ -40,26 +41,33 @@ where
                 Some(last_span) if last_span.end() == span.start() => Spacing::Joint,
                 _ => Spacing::Alone,
             };
-            if let Some(token) = lex_pair(&mut self.iter, pair) {
+            if let Some(token) = lex_pair(self.input, pair) {
                 return (spacing, Some(token));
             }
         }
     }
 }
 
-fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) -> Option<Token> {
+fn convert_span(span: Span<'_>, input: &SourceFile) -> dendro_span::span::Span {
+    dendro_span::span::Span::new(
+        input.absolute_pos(RelPos(span.start())),
+        input.absolute_pos(RelPos(span.end())),
+    )
+}
+
+fn lex_pair(input: &SourceFile, pair: Pair<'_, Rule>) -> Option<Token> {
     let span = pair.as_span();
 
     let kind = match pair.as_rule() {
-        Rule::LineComment => return lex_comment(token::Line, pair),
-        Rule::BlockComment => return lex_comment(token::Block, pair),
+        Rule::LineComment => return lex_comment(input, token::Line, pair),
+        Rule::BlockComment => return lex_comment(input, token::Block, pair),
         Rule::Ident => token::Ident(Symbol::new(pair.as_str()), false),
         Rule::RawIdent => {
             let inner = pair.into_inner().next().unwrap();
             debug_assert_eq!(inner.as_rule(), Rule::Ident);
             return Some(Token {
                 kind: token::Ident(Symbol::new(inner.as_str()), true),
-                span: inner.as_span().into(),
+                span: convert_span(inner.as_span(), input),
             });
         }
         Rule::Prefix => todo!(),
@@ -68,7 +76,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) 
             debug_assert_eq!(inner.as_rule(), Rule::Ident);
             return Some(Token {
                 kind: token::Lifetime(Symbol::new(inner.as_str())),
-                span: inner.as_span().into(),
+                span: convert_span(inner.as_span(), input),
             });
         }
         Rule::Literal => {
@@ -86,7 +94,7 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) 
             let (kind, symbol) = lex_literal(inner, suffix_start);
             return Some(Token {
                 kind: token::Literal(Lit { kind, symbol, suffix }),
-                span: span.into(),
+                span: convert_span(span, input),
             });
         }
         Rule::Semi => token::Semi,
@@ -121,10 +129,13 @@ fn lex_pair<'a, I: Iterator<Item = Pair<'a, Rule>>>(_: I, pair: Pair<'a, Rule>) 
         _ => unreachable!(),
     };
 
-    Some(Token { kind, span: span.into() })
+    Some(Token {
+        kind,
+        span: convert_span(span, input),
+    })
 }
 
-fn lex_comment(kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token> {
+fn lex_comment(input: &SourceFile, kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token> {
     let span = pair.as_span();
     if let Some(inner) = pair.into_inner().next() {
         debug_assert!(matches!(
@@ -140,7 +151,7 @@ fn lex_comment(kind: CommentKind, pair: Pair<'_, Rule>) -> Option<Token> {
         let span = start.span(&span.end_pos());
         return Some(Token {
             kind: token::DocComment(kind, style, Symbol::new(span.as_str())),
-            span: span.into(),
+            span: convert_span(span, input),
         });
     }
     None

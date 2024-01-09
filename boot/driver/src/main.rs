@@ -1,6 +1,7 @@
 use std::{env, fs, panic, process};
 
 use dendro_error::{DiagCx, Error};
+use dendro_resolve::Resolver;
 use dendro_span::{source::SourceMap, FatalError};
 
 fn run_compiler(args: &[String]) -> Result<(), Error> {
@@ -9,6 +10,7 @@ fn run_compiler(args: &[String]) -> Result<(), Error> {
 
     let source_map = SourceMap::default();
     let diag = DiagCx::default();
+    let mut resolver = Resolver::default();
 
     let input = fs::read_to_string(path).expect("failed to read input file");
     let src = source_map.new_source_file(path.into(), input);
@@ -17,8 +19,9 @@ fn run_compiler(args: &[String]) -> Result<(), Error> {
 
     let leaf = dendro_parse::parse(&diag, &tts).unwrap();
 
-    // let leaf = dendro_expand::expand(&source_map, &diag, resolver, leaf)?;
+    let leaf = dendro_expand::expand(&source_map, &diag, &mut resolver, leaf)?;
     println!("{leaf:?}");
+    println!("{:?}", diag.take());
 
     // - expand:
     //   - load unloaded blocks;
