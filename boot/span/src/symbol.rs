@@ -49,6 +49,7 @@ impl fmt::Display for Symbol {
 struct InternerInner {
     strings: Vec<&'static str>,
     map: BTreeMap<&'static str, Symbol>,
+    pool: Option<Pool>,
 }
 
 struct Interner(Mutex<InternerInner>);
@@ -58,6 +59,7 @@ impl Interner {
         Interner(Mutex::new(InternerInner {
             strings: Vec::new(),
             map: BTreeMap::new(),
+            pool: None,
         }))
     }
 
@@ -68,8 +70,8 @@ impl Interner {
         let mut inner = self.0.lock().unwrap();
         let sym = Symbol(inner.strings.len() + kw::MAP.len());
 
-        let pstr = Pool::get_static_pool().intern(s);
-        let s = unsafe { mem::transmute::<_, &'static str>(&*pstr) };
+        let pstr = inner.pool.get_or_insert_with(Pool::new).intern(s);
+        let s = unsafe { mem::transmute::<&str, &'static str>(&*pstr) };
         mem::forget(pstr);
 
         inner.strings.push(s);

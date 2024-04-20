@@ -10,7 +10,7 @@ fn run_compiler(args: &[String]) -> Result<(), Error> {
 
     let source_map = SourceMap::default();
     let diag = DiagCx::default();
-    let mut resolver = Resolver::default();
+    let mut resolver = Resolver::new(&diag);
 
     let input = fs::read_to_string(path).expect("failed to read input file");
     let src = source_map.new_source_file(path.into(), input);

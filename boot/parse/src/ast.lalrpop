@@ -465,15 +465,7 @@ ExprBinary: ExprKind = {
     <lhs:ExprOf<ExprBinary>> <op:(@L ">=" @R)> <rhs:ExprOf<ExprBinary>> =>
         ExprKind::Binary(lhs, BinOp { kind: BinOpKind::Ge, span: Span::new(op.0, op.2) }, rhs),
 
-    #[precedence(level = "6")] #[assoc(side="left")]
-    <lhs:ExprOf<ExprBinary>> <op:Spanned<"&&">> <rhs:ExprOf<ExprBinary>> =>
-        ExprKind::Binary(lhs, op.map(|_| BinOpKind::And), rhs),
-
-    #[precedence(level = "7")] #[assoc(side="left")]
-    <lhs:ExprOf<ExprBinary>> <op:Spanned<"||">> <rhs:ExprOf<ExprBinary>> =>
-        ExprKind::Binary(lhs, op.map(|_| BinOpKind::Or), rhs),
-
-    #[precedence(level = "8")] #[assoc(side = "left")]
+    #[precedence(level = "6")] #[assoc(side = "left")]
     <lhs:ExprOf<ExprBinary>> "`..=" <rhs:ExprOf<ExprBinary>> =>
         ExprKind::Range(Some(lhs), RangeLimits::Closed, Some(rhs)),
     <lhs:ExprOf<ExprBinary>> "`..`" <rhs:ExprOf<ExprBinary>> =>
@@ -481,8 +473,16 @@ ExprBinary: ExprKind = {
     <lhs:ExprOf<ExprBinary>> "`.." =>
         ExprKind::Range(Some(lhs), RangeLimits::HalfOpen, None),
 
-    #[precedence(level = "9")]
+    #[precedence(level = "7")]
     <r:RangeTo<ExprOf<ExprBinary>>> => ExprKind::Range(None, r.0, Some(r.1)),
+
+    #[precedence(level = "8")] #[assoc(side="left")]
+    <lhs:ExprOf<ExprBinary>> <op:Spanned<"&&">> <rhs:ExprOf<ExprBinary>> =>
+        ExprKind::Binary(lhs, op.map(|_| BinOpKind::And), rhs),
+
+    #[precedence(level = "9")] #[assoc(side="left")]
+    <lhs:ExprOf<ExprBinary>> <op:Spanned<"||">> <rhs:ExprOf<ExprBinary>> =>
+        ExprKind::Binary(lhs, op.map(|_| BinOpKind::Or), rhs),
 }
 
 MatchArm: MatchArm = {

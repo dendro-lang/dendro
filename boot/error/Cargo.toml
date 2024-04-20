@@ -7,4 +7,4 @@ version = "0.1.0"
 # Local crates
 dendro-span = {path = "../span"}
 # External crates
-internment = "0.7"
+internment = "0.8"

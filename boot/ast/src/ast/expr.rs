@@ -1,3 +1,5 @@
+use std::fmt;
+
 use dendro_span::{ident::Ident, span::Span};
 
 use super::{Attribute, Lifetime, Mutability, Pat, Spanned, Stmt, DUMMY_ID, P};
@@ -43,6 +45,31 @@ pub enum BinOpKind {
     Or,
 }
 
+impl fmt::Display for BinOpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinOpKind::Mul => write!(f, "*"),
+            BinOpKind::Div => write!(f, "/"),
+            BinOpKind::Rem => write!(f, "%"),
+            BinOpKind::Add => write!(f, "+"),
+            BinOpKind::Sub => write!(f, "-"),
+            BinOpKind::Shl => write!(f, "<<"),
+            BinOpKind::Shr => write!(f, ">>"),
+            BinOpKind::BitXor => write!(f, "^"),
+            BinOpKind::BitAnd => write!(f, "&"),
+            BinOpKind::BitOr => write!(f, "|"),
+            BinOpKind::Eq => write!(f, "=="),
+            BinOpKind::Lt => write!(f, "<"),
+            BinOpKind::Le => write!(f, "<="),
+            BinOpKind::Ne => write!(f, "!="),
+            BinOpKind::Ge => write!(f, ">="),
+            BinOpKind::Gt => write!(f, ">"),
+            BinOpKind::And => write!(f, "&&"),
+            BinOpKind::Or => write!(f, "||"),
+        }
+    }
+}
+
 pub type BinOp = Spanned<BinOpKind>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -55,7 +82,40 @@ pub enum UnOpKind {
     Neg,
 }
 
+impl fmt::Display for UnOpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnOpKind::Deref => write!(f, "*"),
+            UnOpKind::Not => write!(f, "!"),
+            UnOpKind::Neg => write!(f, "-"),
+        }
+    }
+}
+
 pub type UnOp = Spanned<UnOpKind>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OpKind {
+    /// `(+)`
+    Binary(BinOpKind),
+    /// ``(`!)``
+    Unary(UnOpKind),
+    /// `(=)`
+    Assign,
+    /// `(+=)`
+    AssignBinary(BinOpKind),
+}
+
+impl fmt::Display for OpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OpKind::Binary(op) => write!(f, "{}", op),
+            OpKind::Unary(op) => write!(f, "{}", op),
+            OpKind::Assign => write!(f, "="),
+            OpKind::AssignBinary(op) => write!(f, "{}=", op),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Operator {
@@ -69,21 +129,45 @@ pub enum Operator {
     AssignBinary(BinOp),
 }
 
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind().fmt(f)
+    }
+}
+
 impl Operator {
-    pub fn from_bin(kind: BinOpKind, span: Span) -> Self {
+    pub const fn from_bin(kind: BinOpKind, span: Span) -> Self {
         Operator::Binary(BinOp { kind, span })
     }
 
-    pub fn from_un(kind: UnOpKind, span: Span) -> Self {
+    pub const fn from_un(kind: UnOpKind, span: Span) -> Self {
         Operator::Unary(UnOp { kind, span })
     }
 
-    pub fn from_assign(span: Span) -> Self {
+    pub const fn from_assign(span: Span) -> Self {
         Operator::Assign(span)
     }
 
-    pub fn from_assign_bin(kind: BinOpKind, span: Span) -> Self {
+    pub const fn from_assign_bin(kind: BinOpKind, span: Span) -> Self {
         Operator::AssignBinary(BinOp { kind, span })
+    }
+
+    pub const fn kind(self) -> OpKind {
+        match self {
+            Operator::Binary(op) => OpKind::Binary(op.kind),
+            Operator::Unary(op) => OpKind::Unary(op.kind),
+            Operator::Assign(_) => OpKind::Assign,
+            Operator::AssignBinary(op) => OpKind::AssignBinary(op.kind),
+        }
+    }
+
+    pub const fn span(self) -> Span {
+        match self {
+            Operator::Binary(op) => op.span,
+            Operator::Unary(op) => op.span,
+            Operator::Assign(span) => span,
+            Operator::AssignBinary(op) => op.span,
+        }
     }
 }
 

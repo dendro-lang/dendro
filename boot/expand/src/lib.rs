@@ -71,7 +71,7 @@ pub fn expand(
     mut leaf: Leaf,
 ) -> Result<Leaf, Error> {
     let sfile = sources.source_file(leaf.span.start);
-    let mut expander = Expander {
+    Expander {
         sources,
         diag,
         resolver,
@@ -80,7 +80,7 @@ pub fn expand(
             prefix: sfile.path.parent().unwrap_or(&sfile.path).to_owned(),
             file_stack: vec![sfile.path.clone()],
         },
-    };
-    expander.walk_leaf(&mut leaf);
+    }
+    .walk_leaf(&mut leaf);
     Ok(leaf)
 }
