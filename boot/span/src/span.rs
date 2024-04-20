@@ -1,7 +1,16 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, RangeBounds, Sub};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Pos(pub usize);
+
+impl Pos {
+    pub const fn checked_add(self, rel: RelPos) -> Option<Self> {
+        match self.0.checked_add(rel.0) {
+            Some(x) => Some(Pos(x)),
+            None => None,
+        }
+    }
+}
 
 impl From<usize> for Pos {
     fn from(value: usize) -> Self {
@@ -91,6 +100,25 @@ impl Span {
 
     pub fn between(&self, other: &Span) -> Span {
         Span::new(self.end, other.start)
+    }
+
+    pub fn get(&self, bound: impl RangeBounds<RelPos>) -> Option<Span> {
+        let start_bound = self.start.checked_add(match bound.start_bound() {
+            std::ops::Bound::Included(&pos) => pos,
+            std::ops::Bound::Excluded(&pos) => RelPos(pos.0.checked_add(1)?),
+            std::ops::Bound::Unbounded => RelPos(0),
+        })?;
+
+        let end_bound = match bound.end_bound() {
+            std::ops::Bound::Included(&pos) => {
+                self.start.checked_add(RelPos(pos.0.checked_sub(1)?))?
+            }
+            std::ops::Bound::Excluded(&pos) => self.start.checked_add(pos)?,
+            std::ops::Bound::Unbounded => self.end,
+        };
+
+        (start_bound <= end_bound && end_bound <= self.end)
+            .then(|| Span::new(start_bound, end_bound))
     }
 }
 

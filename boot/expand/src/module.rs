@@ -3,11 +3,19 @@ use std::{
     path::{Path, PathBuf, MAIN_SEPARATOR},
 };
 
-use dendro_ast::ast::Leaf;
+use dendro_ast::{
+    ast::{Attribute, Expr, ExprKind, Leaf, P},
+    token::{Lit, LitKind},
+};
 use dendro_error::{DiagCx, Error};
-use dendro_span::{ident::Ident, source::SourceMap, span::Span};
+use dendro_span::{
+    ident::{kw, Ident},
+    source::SourceMap,
+    span::Span,
+};
 
 enum ModError {
+    PathAttrNotFound(Ident, Span, PathBuf),
     NotFound(Ident, PathBuf, PathBuf),
     Ambiguous(Ident, PathBuf, PathBuf),
     CyclingDep(usize),
@@ -29,9 +37,15 @@ pub struct Module {
     pub file_stack: Vec<PathBuf>,
 }
 
-pub fn parse(diag: &DiagCx, sources: &SourceMap, cur: &Module, ident: Ident) -> (Leaf, Module) {
+pub fn parse(
+    diag: &DiagCx,
+    sources: &SourceMap,
+    cur: &Module,
+    ident: Ident,
+    attrs: [&mut Vec<Attribute>; 2],
+) -> (Leaf, Module) {
     let result: Result<_, ModError> = try {
-        let submod = submod_path(&cur.prefix, ident)?;
+        let submod = submod_path(diag, &cur.prefix, ident, attrs)?;
         if let Some(pos) = cur.file_stack.iter().position(|p| p == &submod.path) {
             Err(ModError::CyclingDep(pos))?;
         }
@@ -39,7 +53,7 @@ pub fn parse(diag: &DiagCx, sources: &SourceMap, cur: &Module, ident: Ident) -> 
             fs::read_to_string(&submod.path).map_err(|e| ModError::Io(e, submod.path.clone()))?;
         let sfile = sources.new_source_file(submod.path.clone(), src);
         let tts = dendro_lexer::parse(&sfile, diag);
-        let leaf = dendro_parse::parse(diag, &tts).unwrap();
+        let leaf = dendro_parse::parse_or_default(diag, &tts);
         (leaf, submod)
     };
     let (leaf, submod) = result
@@ -59,8 +73,54 @@ pub fn parse(diag: &DiagCx, sources: &SourceMap, cur: &Module, ident: Ident) -> 
     (leaf, module)
 }
 
-fn submod_path(prefix: &Path, ident: Ident) -> Result<SubmodPath, ModError> {
-    default_submod_path(prefix, ident)
+fn submod_path(
+    diag: &DiagCx,
+    prefix: &Path,
+    ident: Ident,
+    [a0, a1]: [&mut Vec<Attribute>; 2],
+) -> Result<SubmodPath, ModError> {
+    let parse = |span, expr: P<Expr>| match expr.kind {
+        ExprKind::Literal(Lit { kind: LitKind::Str, symbol, .. }) => {
+            let mut path = String::new();
+            dendro_lexer::unescape::unescape_string(symbol.as_str(), expr.span, |res| match res {
+                Ok(ch) => path.push(ch),
+                Err((err, span)) => {
+                    diag.span_err(
+                        span,
+                        format_args!("failed to unescape string literal: {err}"),
+                    );
+                }
+            });
+            Ok((span, PathBuf::from(path)))
+        }
+        _ => Err(diag.span_err(span, "expected string literal")),
+    };
+    let mut paths = Attribute::parse_builtin_eq(a0, kw::PATH, diag, parse);
+    paths.append(&mut Attribute::parse_builtin_eq(a1, kw::PATH, diag, parse));
+
+    if paths.is_empty() {
+        default_submod_path(prefix, ident)
+    } else {
+        let res = paths.swap_remove(0);
+        (paths.into_iter().filter_map(|p| p.ok())).for_each(|(span, _)| {
+            diag.span_err(span, "duplicate `#[path = ..]` attribute");
+        });
+        let (span, path) = res.map_err(ModError::Diag)?;
+        let path = (prefix.join(&path).canonicalize()).map_err(|err| ModError::Io(err, path))?;
+
+        let parent = path.parent().unwrap();
+        let prefix = if path.ends_with("mod.dd") {
+            parent.to_path_buf()
+        } else {
+            parent.join(path.file_prefix().unwrap())
+        };
+
+        if path.exists() {
+            Ok(SubmodPath { path, prefix })
+        } else {
+            Err(ModError::PathAttrNotFound(ident, span, path))
+        }
+    }
 }
 
 fn default_submod_path(prefix: &Path, ident: Ident) -> Result<SubmodPath, ModError> {
@@ -78,6 +138,15 @@ fn default_submod_path(prefix: &Path, ident: Ident) -> Result<SubmodPath, ModErr
 
 fn report_err(diag: &DiagCx, cur: &Module, span: Span, err: ModError) -> Error {
     match err {
+        ModError::PathAttrNotFound(ident, span, path) => diag.span_err(
+            span,
+            format_args!(
+                "file not found for external block `{ident}` in {};\n\
+                please create either of them\
+                or specify the full path to the file via `#[path = \"..\"].`",
+                path.display(),
+            ),
+        ),
         ModError::NotFound(ident, same_dir, subdir) => diag.span_err(
             span,
             format_args!(

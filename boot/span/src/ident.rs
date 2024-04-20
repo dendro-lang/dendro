@@ -56,6 +56,8 @@ keywords![
     LEAF: "leaf",
     SUPER: "super",
     MOD: "mod",
+
+    PATH: "path",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -117,5 +119,11 @@ impl From<&str> for Ident {
 impl AsRef<std::path::Path> for Ident {
     fn as_ref(&self) -> &std::path::Path {
         std::path::Path::new(self.as_str())
+    }
+}
+
+impl PartialEq<Symbol> for Ident {
+    fn eq(&self, other: &Symbol) -> bool {
+        self.name == *other
     }
 }

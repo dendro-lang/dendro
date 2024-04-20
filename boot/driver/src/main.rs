@@ -17,7 +17,7 @@ fn run_compiler(args: &[String]) -> Result<(), Error> {
 
     let tts = dendro_lexer::parse(&src, &diag);
 
-    let leaf = dendro_parse::parse(&diag, &tts).unwrap();
+    let leaf = dendro_parse::parse(&diag, &tts)?;
 
     let leaf = dendro_expand::expand(&source_map, &diag, &mut resolver, leaf)?;
     println!("{leaf:?}");

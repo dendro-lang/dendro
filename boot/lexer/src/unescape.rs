@@ -1,6 +1,6 @@
 use std::str::Chars;
 
-use pest::Span;
+use dendro_span::span::{RelPos, Span};
 
 use crate::imp::Rule;
 
@@ -60,6 +60,82 @@ pub enum EscapeError {
 
     /// After a line ending with '\', multiple lines are skipped.
     MultipleSkippedLinesWarning,
+}
+
+impl std::fmt::Display for EscapeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EscapeError::ZeroChars => {
+                write!(f, "expected 1 char, but 0 were found")
+            }
+            EscapeError::MoreThanOneChar => {
+                write!(f, "expected 1 char, but more than 1 were found")
+            }
+            EscapeError::LoneSlash => {
+                write!(f, "escaped \\ character without continuation")
+            }
+            EscapeError::InvalidEscape => {
+                write!(f, "invalid escape character")
+            }
+            EscapeError::BareCarriageReturn => {
+                write!(f, "raw \\r character")
+            }
+            EscapeError::BareCarriageReturnInRawString => {
+                write!(f, "raw \\r character in raw string literal")
+            }
+            EscapeError::EscapeOnlyChar => {
+                write!(f, "unescaped character that was expected to be escaped")
+            }
+            EscapeError::TooShortHexEscape => {
+                write!(f, "numeric character escape is too short")
+            }
+            EscapeError::InvalidCharInHexEscape => {
+                write!(f, "invalid character in numeric escape")
+            }
+            EscapeError::OutOfRangeHexEscape => {
+                write!(f, "character code in numeric escape is non-ascii")
+            }
+            EscapeError::NoBraceInUnicodeEscape => {
+                write!(f, "\\u not followed by '{{'")
+            }
+            EscapeError::InvalidCharInUnicodeEscape => {
+                write!(f, "non-hexadecimal value in \\u{{..}}")
+            }
+            EscapeError::EmptyUnicodeEscape => {
+                write!(f, "empty unicode escape")
+            }
+            EscapeError::UnclosedUnicodeEscape => {
+                write!(f, "no closing brace in \\u{{..}}")
+            }
+            EscapeError::LeadingUnderscoreUnicodeEscape => {
+                write!(f, "leading underscore in \\u{{..}}")
+            }
+            EscapeError::OverlongUnicodeEscape => {
+                write!(f, "more than 6 characters in \\u{{..}}")
+            }
+            EscapeError::LoneSurrogateUnicodeEscape => {
+                write!(f, "invalid in-bound unicode character code")
+            }
+            EscapeError::OutOfRangeUnicodeEscape => {
+                write!(f, "out of bounds unicode character code")
+            }
+            EscapeError::UnicodeEscapeInByte => {
+                write!(f, "unicode escape code in byte literal")
+            }
+            EscapeError::NonAsciiCharInByte => {
+                write!(f, "non-ascii character in byte literal")
+            }
+            EscapeError::NonAsciiCharInByteString => {
+                write!(f, "non-ascii character in byte string literal")
+            }
+            EscapeError::UnskippedWhitespaceWarning => {
+                write!(f, "after a line ending with \\, the next line contains whitespace characters that are not skipped")
+            }
+            EscapeError::MultipleSkippedLinesWarning => {
+                write!(f, "after a line ending with \\, multiple lines are skipped")
+            }
+        }
+    }
 }
 
 impl EscapeError {
@@ -191,16 +267,16 @@ fn unescape_char_inner(chars: &mut Chars<'_>, rule: Rule) -> Result<char, Escape
     Ok(res)
 }
 
-fn unescape_string_inner<'a, F, T: From<u8> + From<char>>(
-    span: Span<'a>,
+fn unescape_string_inner<F, T: From<u8> + From<char>>(
+    src: &str,
+    span: Span,
     rule: Rule,
     mut callback: F,
 ) where
-    F: FnMut(Result<T, (EscapeError, Span<'a>)>),
+    F: FnMut(Result<T, (EscapeError, Span)>),
 {
     assert!(rule.in_double_quotes());
 
-    let src = span.as_str();
     let initial_len = src.len();
     let mut chars = src.chars();
     while let Some(first_char) = chars.next() {
@@ -227,16 +303,12 @@ fn unescape_string_inner<'a, F, T: From<u8> + From<char>>(
             _ => ascii_check(first_char, rule).map(Into::into),
         };
         let end = initial_len - chars.as_str().len();
-        callback(res.map_err(|err| (err, span.get(start..end).unwrap())));
+        callback(res.map_err(|err| (err, span.get(RelPos(start)..RelPos(end)).unwrap())));
     }
 
-    fn skip_ascii_whitespace<'a, F>(
-        chars: &mut Chars<'_>,
-        start: usize,
-        span: Span<'a>,
-        mut callback: F,
-    ) where
-        F: FnMut(EscapeError, Span<'a>),
+    fn skip_ascii_whitespace<F>(chars: &mut Chars<'_>, start: usize, span: Span, mut callback: F)
+    where
+        F: FnMut(EscapeError, Span),
     {
         let tail = chars.as_str();
         let first_non_space = tail
@@ -248,7 +320,7 @@ fn unescape_string_inner<'a, F, T: From<u8> + From<char>>(
             let end = start + first_non_space + 1;
             callback(
                 EscapeError::MultipleSkippedLinesWarning,
-                span.get(start..end).unwrap(),
+                span.get(RelPos(start)..RelPos(end)).unwrap(),
             );
         }
         let tail = &tail[first_non_space..];
@@ -260,7 +332,7 @@ fn unescape_string_inner<'a, F, T: From<u8> + From<char>>(
             if c.is_whitespace() {
                 callback(
                     EscapeError::UnskippedWhitespaceWarning,
-                    span.get(start..end).unwrap(),
+                    span.get(RelPos(start)..RelPos(end)).unwrap(),
                 );
             }
         }
@@ -274,38 +346,36 @@ pub fn byte_from_char(c: char) -> u8 {
     res as u8
 }
 
-pub fn unescape_char(span: Span<'_>) -> Result<char, (EscapeError, Span<'_>)> {
-    let s = span.as_str();
+pub fn unescape_char(s: &str, span: Span) -> Result<char, (EscapeError, Span)> {
     let mut chars = s.chars();
     let result = unescape_char_inner(&mut chars, Rule::Char);
     result.map_err(|err| {
-        let span = span.get(..(s.len() - chars.as_str().len())).unwrap();
+        let span = span.get(..RelPos(s.len() - chars.as_str().len())).unwrap();
         (err, span)
     })
 }
 
-pub fn unescape_byte(span: Span<'_>) -> Result<u8, (EscapeError, Span<'_>)> {
-    let s = span.as_str();
+pub fn unescape_byte(s: &str, span: Span) -> Result<u8, (EscapeError, Span)> {
     let mut chars = s.chars();
     let result = unescape_char_inner(&mut chars, Rule::Byte);
     result.map(byte_from_char).map_err(|err| {
-        let span = span.get(..(s.len() - chars.as_str().len())).unwrap();
+        let span = span.get(..RelPos(s.len() - chars.as_str().len())).unwrap();
         (err, span)
     })
 }
 
-pub fn unescape_string<'a, F>(span: Span<'a>, callback: F)
+pub fn unescape_string<F>(s: &str, span: Span, callback: F)
 where
-    F: FnMut(Result<char, (EscapeError, Span<'a>)>),
+    F: FnMut(Result<char, (EscapeError, Span)>),
 {
-    unescape_string_inner(span, Rule::String, callback)
+    unescape_string_inner(s, span, Rule::String, callback)
 }
 
-pub fn unescape_byte_string<'a, F>(span: Span<'a>, callback: F)
+pub fn unescape_byte_string<F>(s: &str, span: Span, callback: F)
 where
-    F: FnMut(Result<char, (EscapeError, Span<'a>)>),
+    F: FnMut(Result<char, (EscapeError, Span)>),
 {
-    unescape_string_inner(span, Rule::ByteString, callback)
+    unescape_string_inner(s, span, Rule::ByteString, callback)
 }
 
 /// A unit within CStr. Must not be a nul character.
@@ -326,9 +396,9 @@ impl From<char> for CStrUnit {
     }
 }
 
-pub fn unescape_c_string<'a, F>(span: Span<'a>, callback: F)
+pub fn unescape_c_string<F>(s: &str, span: Span, callback: F)
 where
-    F: FnMut(Result<CStrUnit, (EscapeError, Span<'a>)>),
+    F: FnMut(Result<CStrUnit, (EscapeError, Span)>),
 {
-    unescape_string_inner(span, Rule::CString, callback)
+    unescape_string_inner(s, span, Rule::CString, callback)
 }

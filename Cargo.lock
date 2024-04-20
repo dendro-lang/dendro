@@ -121,6 +121,7 @@ dependencies = [
 name = "dendro-ast"
 version = "0.1.0"
 dependencies = [
+ "dendro-error",
  "dendro-span",
  "pest",
  "smallvec",

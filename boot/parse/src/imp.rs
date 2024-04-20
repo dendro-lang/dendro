@@ -161,15 +161,31 @@ impl<'a, 'diag> Iterator for Iter<'a, 'diag> {
     }
 }
 
-pub fn parse<'diag>(diag: &'diag DiagCx, input: &TokenStream) -> Result<Leaf, ParseError<'diag>> {
+pub fn parse(diag: &DiagCx, input: &TokenStream) -> Result<Leaf, Error> {
     let tf = TokenFrames::new(diag, input.trees());
     let mut cx = ParseCx::default();
-    ast::LeafParser::new().parse(diag, &mut cx, tf)
+    ast::LeafParser::new()
+        .parse(diag, &mut cx, tf)
+        .map_err(|err| span_leaf_err(diag, err))
+}
+
+pub fn parse_or_default(diag: &DiagCx, input: &TokenStream) -> Leaf {
+    parse(diag, input).unwrap_or_else(|_| Leaf::default())
 }
 
 fn span_expr_err<'diag>(_: &'diag DiagCx, _: ErrorRecovery<'diag>) {}
 
 fn span_pat_err<'diag>(_: &'diag DiagCx, _: ErrorRecovery<'diag>) {}
+
+fn span_leaf_err<'diag>(_: &'diag DiagCx, err: ParseError<'diag>) -> Error {
+    match err {
+        lalrpop_util::ParseError::User { error } => error,
+        lalrpop_util::ParseError::InvalidToken { .. } => todo!(),
+        lalrpop_util::ParseError::UnrecognizedEof { .. } => todo!(),
+        lalrpop_util::ParseError::UnrecognizedToken { .. } => todo!(),
+        lalrpop_util::ParseError::ExtraToken { .. } => todo!(),
+    }
+}
 
 #[cfg(test)]
 mod tests {

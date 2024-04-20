@@ -34,9 +34,9 @@ impl Symbol {
     }
 }
 
-impl PartialEq<&str> for Symbol {
-    fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
+impl PartialEq<str> for Symbol {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
     }
 }
 
@@ -80,7 +80,7 @@ impl Interner {
         sym
     }
 
-    fn get(&self, symbol: Symbol) -> &'static str {
+    fn get(&self, symbol: Symbol) -> &str {
         match symbol.0.checked_sub(SYMBOL_PREFILL.len()) {
             Some(index) => self.0.lock().unwrap().strings[index],
             None => SYMBOL_PREFILL[symbol.0],
